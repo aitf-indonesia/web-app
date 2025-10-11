@@ -165,64 +165,60 @@ export default function PRDDashboardPage() {
           <div className="h-full flex flex-col gap-4 p-4">
             {/* Control panel */}
             <Card className="p-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold">
-                  {TAB_ORDER.find((t) => t.key === activeTab)?.label} ({activeCount})
-                </h2>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    // soft revalidate from server
-                    mutate()
-                  }}
-                >
-                  Ask AI
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Input
-                    placeholder="Search..."
-                    value={search}
-                    onChange={(e) => {
-                      setSearch(e.target.value)
-                      resetPagination()
-                    }}
-                    className="pl-8 h-8 text-sm"
-                  />
-                  <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-foreground/40">
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                      <path
-                        fillRule="evenodd"
-                        d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </span>
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold">
+                    {TAB_ORDER.find((t) => t.key === activeTab)?.label} ({activeCount})
+                  </h2>
                 </div>
 
-                <SortMenu
-                  sortCol={sortCol}
-                  sortOrder={sortOrder}
-                  onApply={(c, o) => {
-                    setSortCol(c)
-                    setSortOrder(o)
-                  }}
-                />
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Input
+                      placeholder="Search..."
+                      value={search}
+                      onChange={(e) => {
+                        setSearch(e.target.value)
+                        resetPagination()
+                      }}
+                      className="pl-8 h-8 text-sm"
+                    />
+                    <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-foreground/40">
+                      <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                        <path
+                          fillRule="evenodd"
+                          d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </span>
+                  </div>
 
-                <FilterMenu
-                  value={jenisFilter}
-                  onApply={(v) => {
-                    setJenisFilter(v)
-                    resetPagination()
-                  }}
-                />
+                  <SortMenu
+                    sortCol={sortCol}
+                    sortOrder={sortOrder}
+                    onApply={(c, o) => {
+                      setSortCol(c)
+                      setSortOrder(o)
+                    }}
+                  />
 
-                <Button size="sm" variant="outline" className="bg-card text-foreground/80 border border-border">
-                  Crawling
-                </Button>
+                  <FilterMenu
+                    value={jenisFilter}
+                    onApply={(v) => {
+                      setJenisFilter(v)
+                      resetPagination()
+                    }}
+                  />
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="bg-black text-white hover:bg-[rgba(0, 0, 0, 0.30)] border border-border h-8 px-3"
+                  >
+                    Crawling
+                  </Button>
+                </div>
               </div>
             </Card>
 
@@ -597,6 +593,7 @@ function DetailModal({
   async function send() {
     const content = message.trim()
     if (!content) return
+    if (!item) return
     setChat((c) => [...c, { role: "user", text: content, ts: Date.now(), link: item.link }])
     setMessage("")
     setLoading(true)
@@ -622,6 +619,7 @@ function DetailModal({
   }
 
   async function updateStatus(next: Status) {
+    if (!item) return
     await fetch("/api/links/update", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -633,6 +631,7 @@ function DetailModal({
   }
 
   async function toggleFlag() {
+    if (!item) return
     const nextVal = !flaggedLocal
     await fetch("/api/links/update", {
       method: "POST",
@@ -753,16 +752,14 @@ function DetailModal({
                       Ubah ke Verified
                     </Button>
                   )}
-                  {item.status !== "unverified" && (
-                    <Button
-                      className="text-xs md:text-sm bg-transparent whitespace-nowrap leading-tight"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => updateStatus("unverified")}
-                    >
-                      Ubah ke Unverified
-                    </Button>
-                  )}
+                  <Button
+                    className="text-xs md:text-sm bg-transparent whitespace-nowrap leading-tight"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => updateStatus("unverified")}
+                  >
+                    Ubah ke Unverified
+                  </Button>
                 </div>
               )}
             </div>
