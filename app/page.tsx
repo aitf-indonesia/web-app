@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
 type Status = "verified" | "unverified" | "false-positive"
 type Jenis = "Judi" | "Pornografi" | "Penipuan"
@@ -590,6 +592,15 @@ function DetailModal({
     }
   }, [chat])
 
+  function sanitizeReply(s: string) {
+    if (!s) return s
+    let out = String(s)
+    out = out.replace(/\r\n/g, "\n")
+    out = out.replace(/[ \t]+\n/g, "\n")
+    out = out.replace(/\n{3,}/g, "\n\n")
+    return out.trim()
+  }
+
   async function send() {
     const content = message.trim()
     if (!content) return
@@ -604,10 +615,9 @@ function DetailModal({
         body: JSON.stringify({ question: content, item }),
       })
       const data = await res.json()
-      setChat((c) => [
-        ...c,
-        { role: "assistant", text: data.reply ?? "Maaf, tidak ada balasan.", ts: Date.now(), link: item.link },
-      ])
+      const raw = data.reply ?? "Maaf, tidak ada balasan."
+      const cleaned = sanitizeReply(raw)
+      setChat((c) => [...c, { role: "assistant", text: cleaned, ts: Date.now(), link: item.link }])
     } catch (e) {
       setChat((c) => [
         ...c,
@@ -647,7 +657,7 @@ function DetailModal({
 
   return (
     <Dialog open={!!item} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-[min(95vw,1000px)] sm:max-w-[min(95vw,1000px)] max-h-[100vh]">
+      <DialogContent className="max-w-[min(95vw,1200px)] sm:max-w-[min(95vw,1200px)] max-h-[100vh]">
         <DialogHeader>
           <DialogTitle>{toHexId(item.id)} · Info Detail</DialogTitle>
         </DialogHeader>
@@ -772,13 +782,15 @@ function DetailModal({
                 <div key={i} className={cn("text-sm flex", m.role === "user" ? "justify-end" : "justify-start")}>
                   <div
                     className={cn(
-                      "rounded-lg px-3 py-2 max-w-[75%]",
+                      "rounded-lg px-3 py-2 max-w-[85%]",
                       m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted",
                     )}
                     title={`Link: ${m.link} • ${new Date(m.ts).toLocaleString()}`}
                   >
                     <div className="text-[10px] opacity-70 mb-1">{new Date(m.ts).toLocaleTimeString()}</div>
-                    {m.text}
+                    <div className="chat-md">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
+                    </div>
                   </div>
                 </div>
               ))}
