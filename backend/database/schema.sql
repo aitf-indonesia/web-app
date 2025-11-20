@@ -3,7 +3,8 @@ CREATE TABLE IF NOT EXISTS crawling_data (
     url TEXT,
     title VARCHAR(255),
     description TEXT,
-    keywords TEXT,
+    domain VARCHAR(255),
+    og_metadata JSONB,
     image_path TEXT,
     date_crawled TIMESTAMPTZ DEFAULT now(),
     status VARCHAR(20) DEFAULT 'pending'

@@ -2,6 +2,7 @@ import os
 import pandas as pd
 from sqlalchemy import create_engine, text
 from pathlib import Path
+from urllib.parse import urlparse
 
 DB_URL = os.getenv("DB_URL", "postgresql://postgres:root@localhost:5432/prd")
 engine = create_engine(DB_URL)
@@ -28,12 +29,21 @@ with engine.begin() as conn:
         title = row.get("title", "")[:255] if pd.notna(row.get("title")) else ""
         description = row.get("description", "") if pd.notna(row.get("description")) else ""
         
+        # Extract domain from URL
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc if parsed_url.netloc else None
+        
+        # Initialize og_metadata as None (or an empty JSON string if preferred)
+        og_metadata = None # This would typically be populated by a crawler
+        
+        status = 'processed' # Maintain original status
+        
         # Insert into crawling_data
         result = conn.execute(text("""
-            INSERT INTO crawling_data (url, title, description, keywords, status)
-            VALUES (:url, :title, :description, 'judi online', 'processed')
+            INSERT INTO crawling_data (url, title, description, domain, og_metadata, status)
+            VALUES (:url, :title, :description, :domain, :og_metadata, :status)
             RETURNING id_crawling
-        """), {"url": url, "title": title, "description": description})
+        """), {"url": url, "title": title, "description": description, "domain": domain, "og_metadata": og_metadata, "status": status})
         
         id_crawling = result.fetchone()[0]
         
