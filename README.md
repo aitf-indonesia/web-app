@@ -80,6 +80,37 @@ docker-compose up -d
 
 ---
 
+## 🖥️ Native VPS Setup (Without Docker)
+
+Untuk VPS yang tidak support Docker (seperti container-based VPS), gunakan native deployment.
+
+### **Quick Start**
+
+```bash
+# 1. Clone repository
+git clone <repository-url>
+cd prototype-dashboard-chatbot
+
+# 2. Run setup script (requires sudo)
+sudo bash setup-native-vps.sh
+
+# 3. Configure environment
+cp env.example .env
+nano .env  # Update GEMINI_API_KEY dan konfigurasi lainnya
+
+# 4. Start services
+sudo bash scripts/start-services.sh
+
+# 5. Akses aplikasi
+# Frontend: http://localhost:3000
+# Backend: http://localhost:8000
+# API Docs: http://localhost:8000/docs
+```
+
+📚 **Panduan lengkap**: Lihat [NATIVE_DEPLOYMENT.md](./NATIVE_DEPLOYMENT.md) untuk dokumentasi detail, service management, troubleshooting, dan optimization.
+
+---
+
 ## 🛠️ Manual Setup (Alternative)
 
 Jika tidak menggunakan Docker, ikuti langkah berikut:
