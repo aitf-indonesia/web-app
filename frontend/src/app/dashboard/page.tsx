@@ -64,7 +64,7 @@ export default function PRDDashboardPage() {
 
 
   const filtered = useMemo(() => {
-    const list = data ?? []
+    const list = Array.isArray(data) ? data : []
     return list.filter((it) => {
       const matchTab =
         activeTab === "all"

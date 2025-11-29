@@ -219,7 +219,7 @@ def take_screenshot_worker(url, output_path, item_id):
     """Worker function for taking screenshot (must be picklable for multiprocessing)."""
     try:
         options = Options()
-        options.binary_location = "/usr/bin/google-chrome"
+        options.binary_location = "/home/ubuntu/chrome/bin/google-chrome"
         
         # Essential headless arguments
         options.add_argument("--headless=new")
@@ -241,7 +241,7 @@ def take_screenshot_worker(url, output_path, item_id):
         options.add_argument("--log-level=3")
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
         
-        service = Service("/usr/bin/chromedriver")
+        service = Service("/home/ubuntu/chrome/bin/chromedriver")
         driver = webdriver.Chrome(service=service, options=options)
         
         # Increased timeout
@@ -264,7 +264,7 @@ def take_screenshot(url, output_path, retries=2):
     """Take screenshot of the URL (no retries on timeout)."""
     try:
         options = Options()
-        options.binary_location = "/usr/bin/google-chrome"
+        options.binary_location = "/home/ubuntu/chrome/bin/google-chrome"
         
         # Essential headless arguments
         options.add_argument("--headless=new")
@@ -286,7 +286,7 @@ def take_screenshot(url, output_path, retries=2):
         options.add_argument("--log-level=3")
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
         
-        service = Service("/usr/bin/chromedriver")
+        service = Service("/home/ubuntu/chrome/bin/chromedriver")
         driver = webdriver.Chrome(service=service, options=options)
         
         # Increased timeout

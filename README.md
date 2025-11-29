@@ -2,438 +2,191 @@
 
 Dashboard analisis untuk review dan triage hasil deteksi konten. Dibangun dengan arsitektur full-stack menggunakan **Next.js** (App Router) + **FastAPI** backend, dengan integrasi database PostgreSQL dan AI assistant powered by Google Gemini.
 
----
-
-## 🚀 Deployment
-
-**Frontend**: [https://prd-analyst.vercel.app](https://prd-analyst.vercel.app)
-
----
-
-## 📋 Arsitektur
+## 📋 Tech Stack
 
 ### **Frontend**
-- **Framework**: Next.js 16 (App Router)
-- **UI**: React 19 + TypeScript + TailwindCSS v4
-- **State Management**: SWR untuk data fetching
-- **Visualisasi**: Recharts untuk grafik dan analytics
-- **Styling**: Radix UI components + Lucide icons
+- Next.js 16 (App Router) + React 19 + TypeScript
+- TailwindCSS v4 + Radix UI + Lucide Icons
+- SWR untuk data fetching
+- Recharts untuk visualisasi
 
 ### **Backend**
-- **Framework**: FastAPI (Python)
-- **Database**: PostgreSQL
-- **ORM**: SQLAlchemy
-- **AI Integration**: Google Gemini API
-- **Server**: Uvicorn (ASGI)
-
-### **Database Schema**
-- `crawling_data` - Data hasil crawling URL
-- `reasoning` - Hasil analisis teks/reasoning
-- `object_detection` - Hasil deteksi objek dari gambar
-- `results` - Hasil final gabungan reasoning + detection
-
----
+- FastAPI (Python) + SQLAlchemy
+- PostgreSQL Database
+- Google Gemini API
+- Uvicorn (ASGI Server)
 
 ## 🛠️ Setup & Installation
 
 ### **Prerequisites**
-- Node.js 18+ dan pnpm
-- Python 3.9+
-- PostgreSQL 14+
-
-### **1. Clone Repository**
-```bash
-git clone <repository-url>
-cd prototype-dashboard-chatbot
-```
-
----
-
-## 🐳 Docker Setup (Recommended)
-
-Cara tercepat untuk menjalankan aplikasi dengan semua dependencies terisolasi.
-
-### **Quick Start**
-
-```bash
-# 1. Buat file .env
-cat > .env << 'EOF'
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_DB=prd
-DB_URL=postgresql://postgres:postgres@db:5432/prd
-FRONTEND_URL=http://localhost:3000
-GEMINI_API_KEY=your_gemini_api_key_here
-NEXT_PUBLIC_API_URL=http://localhost:8000
-EOF
-
-# 2. Build dan run
-docker-compose up -d
-
-# 3. Akses aplikasi
-# Frontend: http://localhost:3000
-# Backend: http://localhost:8000
-# API Docs: http://localhost:8000/docs
-```
-
-📚 **Panduan lengkap**: Lihat [DOCKER_GUIDE.md](./DOCKER_GUIDE.md) untuk dokumentasi detail, troubleshooting, dan production deployment.
-
----
-
-## 🖥️ Native VPS Setup (Without Docker)
-
-Untuk VPS yang tidak support Docker (seperti container-based VPS), gunakan native deployment.
+- VPS dengan Ubuntu 20.04+
+- Conda (Miniconda/Anaconda) sudah terinstall
+- Minimal 2GB RAM, 10GB disk space
 
 ### **Quick Start**
 
 ```bash
 # 1. Clone repository
-git clone <repository-url>
-cd prototype-dashboard-chatbot
+cd /home/ubuntu
+git clone <repository-url> tim6_prd_workdir
+cd tim6_prd_workdir
 
 # 2. Run setup script (requires sudo)
 sudo bash setup-native-vps.sh
 
 # 3. Configure environment
-cp env.example .env
 nano .env  # Update GEMINI_API_KEY dan konfigurasi lainnya
-
-# 4. Start services
-sudo bash scripts/start-services.sh
-
-# 5. Akses aplikasi
-# Frontend: http://localhost:3000
-# Backend: http://localhost:8000
-# API Docs: http://localhost:8000/docs
 ```
 
-📚 **Panduan lengkap**: Lihat [NATIVE_DEPLOYMENT.md](./NATIVE_DEPLOYMENT.md) untuk dokumentasi detail, service management, troubleshooting, dan optimization.
-
----
-
-## 🛠️ Manual Setup (Alternative)
-
-Jika tidak menggunakan Docker, ikuti langkah berikut:
-
-### **Prerequisites**
-- Node.js 18+ dan pnpm
-- Python 3.9+
-- PostgreSQL 14+
-
-```bash
-# Buat database PostgreSQL
-createdb prd
-
-# Jalankan schema
-psql -d prd -f backend/database/schema.sql
-```
-
-### **3. Setup Backend**
-```bash
-cd backend
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Buat file .env
-cat > .env << EOF
-DB_URL=postgresql://postgres:root@localhost:5432/prd
-FRONTEND_URL=http://localhost:3000
-GEMINI_API_KEY=your_gemini_api_key_here
-EOF
-
-# Seed data (opsional)
-python seed_data.py
-```
-
-### **4. Setup Frontend**
-```bash
-cd frontend
-
-# Install dependencies
-pnpm install
-
-# Buat file .env.local
-cat > .env.local << EOF
-NEXT_PUBLIC_API_URL=http://localhost:8000
-EOF
-```
-
----
+Setup script akan menginstall:
+- ✅ Conda environment `prd6` dengan Python 3.11
+- ✅ Node.js 20 + pnpm
+- ✅ PostgreSQL 14
+- ✅ Chrome + ChromeDriver
+- ✅ Semua dependencies dan database schema
 
 ## 🎯 Menjalankan Aplikasi
 
-### **Development Mode**
+### **Start Application**
 
-**Terminal 1 - Backend:**
 ```bash
-cd backend
-uvicorn main:app --reload
-```
-Backend akan berjalan di `http://localhost:8000`
+# Development mode (default)
+./start-app.sh
 
-**Terminal 2 - Frontend:**
+# atau
+./start-app.sh dev
+
+# Production mode
+./start-app.sh prod
+```
+
+Script akan:
+- ✅ Mengaktifkan conda environment `prd6`
+- ✅ Membersihkan port yang sudah digunakan (3000, 8000)
+- ✅ Menjalankan backend (FastAPI) di port 8000
+- ✅ Menjalankan frontend (Next.js) di port 3000
+- ✅ Menampilkan informasi PID dan lokasi log
+
+### **Stop Application**
+
 ```bash
-cd frontend
-pnpm run dev
+./stop-app.sh
 ```
-Frontend akan berjalan di `http://localhost:3000`
 
-### **Production Build**
+Script akan:
+- ✅ Menghentikan frontend (port 3000)
+- ✅ Menghentikan backend (port 8000)
+- ✅ Memverifikasi semua proses sudah berhenti
 
-**Backend:**
+### **View Logs**
+
 ```bash
-cd backend
-uvicorn main:app --host 0.0.0.0 --port 8000
+# Backend logs
+tail -f /tmp/backend.log
+
+# Frontend logs
+tail -f /tmp/frontend.log
+
+# Follow both logs
+tail -f /tmp/backend.log /tmp/frontend.log
 ```
 
-**Frontend:**
-```bash
-cd frontend
-pnpm build
-pnpm start
+## 📁 Struktur Project
+
+```
+tim6_prd_workdir/
+├── backend/                    # FastAPI backend
+│   ├── main.py                # Entry point
+│   ├── db.py                  # Database connection
+│   ├── routes/                # API endpoints
+│   ├── database/schema.sql    # Database schema
+│   └── requirements.txt
+├── frontend/                   # Next.js frontend
+│   ├── src/app/               # App Router pages
+│   ├── src/components/        # React components
+│   └── package.json
+├── start-app.sh               # Start application script
+├── stop-app.sh                # Stop application script
+├── setup-native-vps.sh        # VPS setup script
+├── .env                       # Environment config
+└── README.md
 ```
 
----
-
-## 📁 Struktur File Penting
-
-### **Frontend**
-```
-frontend/
-├── src/
-│   ├── app/
-│   │   ├── layout.tsx          # Root layout
-│   │   ├── page.tsx            # Homepage
-│   │   └── dashboard/
-│   │       └── page.tsx        # Dashboard utama
-│   ├── components/
-│   │   ├── ui/                 # UI primitives (Button, Dialog, dll)
-│   │   └── modals/
-│   │       ├── DataTable.tsx   # Tabel data hasil
-│   │       └── DetailModal.tsx # Modal detail item
-│   └── styles/
-│       └── globals.css         # Tailwind entry point
-└── package.json
-```
-
-### **Backend**
-```
-backend/
-├── main.py                     # FastAPI app entry point
-├── db.py                       # Database connection
-├── database/
-│   └── schema.sql              # Database schema
-├── routes/
-│   ├── data_routes.py          # CRUD data endpoints
-│   ├── chat_routes.py          # Chat assistant API
-│   ├── text_analyze_routes.py # Text analysis
-│   ├── image_analyze_routes.py # Image analysis
-│   ├── law_rag_routes.py       # Legal RAG endpoints
-│   ├── update_routes.py        # Update operations
-│   └── history_routes.py       # History tracking
-├── stores/
-│   ├── history_store.py        # Chat history storage
-│   └── overrides_store.py      # User overrides
-├── seed_data.py                # Data seeding script
-└── requirements.txt
-```
-
----
-
-## 💻 Perintah Pengguna
+## 💻 Development Commands
 
 ### **Database Management**
 ```bash
+# Access PostgreSQL
+/home/ubuntu/postgresql/bin/psql -U postgres -d prd
+
 # Seed data dari CSV
 cd backend
+conda activate prd6
 python seed_data.py
 
-# Reset database
-psql -d prd -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-psql -d prd -f database/schema.sql
-
 # Backup database
-pg_dump prd > backup_$(date +%Y%m%d).sql
-
-# Restore database
-psql -d prd < backup_20250120.sql
+/home/ubuntu/postgresql/bin/pg_dump -U postgres prd > backup_$(date +%Y%m%d).sql
 ```
 
-### **Development**
+### **Manual Development**
 ```bash
-# Install semua dependencies
-cd frontend && pnpm install
-cd ../backend && pip install -r requirements.txt
+# Activate conda environment
+conda activate prd6
 
-# Run tests (jika ada)
-cd frontend && pnpm test
-cd backend && pytest
+# Run backend manually
+cd backend
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
-# Lint & format
-cd frontend && pnpm lint
-cd backend && black . && flake8
+# Run frontend manually (in another terminal)
+cd frontend
+pnpm run dev
 ```
-
-### **Git Workflow**
-```bash
-# Buat branch baru
-git checkout -b dev-username
-
-# Commit changes
-git add .
-git commit -m "feat: description"
-
-# Push ke remote
-git push origin dev-username
-
-# Merge ke master (setelah review)
-git checkout master
-git merge dev-username
-git push origin master
-```
-
----
 
 ## 🐛 Troubleshooting
 
-### **Problem: Backend tidak bisa connect ke database**
+### **Port sudah digunakan**
 ```bash
-# Error: "could not connect to server"
-# Solusi:
-1. Pastikan PostgreSQL running:
-   sudo systemctl status postgresql
-   sudo systemctl start postgresql
-
-2. Cek connection string di .env:
-   DB_URL=postgresql://user:password@localhost:5432/prd
-
-3. Test koneksi manual:
-   psql -d prd -U postgres
-```
-
-### **Problem: Frontend tidak bisa fetch data dari backend**
-```bash
-# Error: "Failed to fetch" atau CORS error
-# Solusi:
-1. Pastikan backend running di port 8000
-2. Cek NEXT_PUBLIC_API_URL di frontend/.env.local
-3. Cek FRONTEND_URL di backend/.env
-4. Restart kedua server
-```
-
-### **Problem: Module not found di backend**
-```bash
-# Error: "ModuleNotFoundError: No module named 'xxx'"
-# Solusi:
-cd backend
-pip install -r requirements.txt
-
-# Jika masih error, coba:
-pip install --upgrade pip
-pip install -r requirements.txt --force-reinstall
-```
-
-### **Problem: pnpm command not found**
-```bash
-# Solusi:
-npm install -g pnpm
-
-# Atau gunakan npm sebagai alternatif:
-cd frontend
-npm install
-npm run dev
-```
-
-### **Problem: Port sudah digunakan**
-```bash
-# Error: "Address already in use"
-# Solusi untuk port 8000 (backend):
+# Kill port 8000 (backend)
 lsof -ti:8000 | xargs kill -9
 
-# Solusi untuk port 3000 (frontend):
+# Kill port 3000 (frontend)
 lsof -ti:3000 | xargs kill -9
 ```
 
-### **Problem: Database schema tidak sesuai**
+### **Backend tidak bisa connect ke database**
 ```bash
-# Error: "relation does not exist" atau "column does not exist"
-# Solusi:
+# Start PostgreSQL
+/home/ubuntu/postgresql/bin/pg_ctl -D /home/ubuntu/postgresql/data start
+
+# Test koneksi
+/home/ubuntu/postgresql/bin/psql -U postgres -d prd
+```
+
+### **Module not found di backend**
+```bash
+conda activate prd6
 cd backend
-psql -d prd -f database/schema.sql
-
-# Jika perlu reset total:
-psql -d prd -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-psql -d prd -f database/schema.sql
-python seed_data.py
+pip install -r requirements.txt
 ```
 
-### **Problem: Gemini API error**
+### **pnpm command not found**
 ```bash
-# Error: "API key not valid" atau rate limit
-# Solusi:
-1. Cek GEMINI_API_KEY di backend/.env
-2. Dapatkan API key baru di: https://makersuite.google.com/app/apikey
-3. Pastikan API key valid dan tidak expired
-4. Cek quota di Google Cloud Console
+source ~/.bashrc
+# atau
+npm install -g pnpm
 ```
 
-### **Problem: Build error di frontend**
+📚 **Troubleshooting lengkap**: Lihat [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
+
+## 📝 Environment Variables
+
+Copy dari `env.example` dan sesuaikan:
+
 ```bash
-# Error saat pnpm build
-# Solusi:
-cd frontend
-rm -rf .next node_modules
-pnpm install
-pnpm build
-
-# Jika masih error, cek TypeScript errors:
-pnpm tsc --noEmit
+cp env.example .env
+nano .env
 ```
 
----
-
-## 📝 v2 Notes
-
-### **Perubahan dari v1:**
-- ✅ **Backend Migration**: Dari Next.js API routes ke FastAPI standalone
-- ✅ **Database Integration**: PostgreSQL dengan schema terstruktur
-- ✅ **Multi-route Architecture**: Modular routing untuk berbagai fitur
-- ✅ **Data Seeding**: Script otomatis untuk populate database
-- ✅ **Enhanced UI**: Dashboard dengan data table, modals, dan visualisasi
-- ✅ **AI Features**: Text analysis, image analysis, dan legal RAG
-
-### **AI Integration:**
-- Primary: Google Gemini API via `@google/generative-ai` SDK
-- Fallback: Vercel AI SDK dengan `generateText`
-- Response format: Markdown dengan sanitization via `react-markdown` + `remark-gfm`
-- **Note**: Gemini adalah setup sementara — akan diganti dengan Mistral sebagai LLM provider
-
-### **Upcoming Features:**
-- [ ] Mistral LLM integration
-- [ ] Advanced analytics dashboard
-- [ ] Batch processing untuk bulk analysis
-- [ ] Export data ke CSV/Excel
-- [ ] User authentication & authorization
-
----
-
-## 🤝 Contributing
-
-1. Fork repository
-2. Buat branch baru (`git checkout -b feature/AmazingFeature`)
-3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push ke branch (`git push origin feature/AmazingFeature`)
-5. Buat Pull Request
-
----
-
-## 📄 License
-
-Project ini dibuat untuk keperluan internal AITF Universitas Brawijaya.
-
----
-
-## 📞 Support
-
-Jika ada pertanyaan atau issue, silakan buat issue di repository atau hubungi tim development.
+**Required variables:**
+- `DB_URL` - PostgreSQL connection string
+- `FRONTEND_URL` - Frontend URL (untuk CORS)
