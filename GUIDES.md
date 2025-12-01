@@ -8,17 +8,10 @@
 - [Setup](#setup)
 - [Quick Start](#quick-start)
 - [Configuration Files](#configuration-files)
-- [Update & Maintenance](#update--maintenance)
 - [Monitoring](#monitoring)
 - [Useful Commands](#useful-commands)
-- [Database Guides](#database-guides)
-- [Common Issues & Solutions](#common-issues--solutions)
-- [Helper Scripts](#helper-scripts)
-- [Command Reference](#command-reference)
-- [Best Practices](#best-practices)
-- [Deployment Checklist](#deployment-checklist)
+- [Other Guides](#other-guides)
 - [Important Notes](#important-notes)
-- [Security Notes](#security-notes)
 - [Support & Resources](#support--resources)
 
 ## Overview
@@ -102,33 +95,7 @@ Access Application: http://localhost:3000 (frontend), http://localhost:8000 (bac
 
 If you use local browser then forward port 3000 to your local machine
 
-## Configuration Files
-
-1. `ecosystem.config.js`: PM2 configuration for both frontend and backend.
-    
-    **Key Settings**:
-    - Frontend: npm start on port 3000
-    - Backend: wrapper script with conda environment
-    - Auto-restart enabled
-    - Memory limit: 1GB each
-    - Logs in `/home/ubuntu/tim6_prd_workdir/logs/`
-
-2. `nginx.conf`: Nginx reverse proxy configuration.
-    
-    **Key Settings**:
-    - Listen on port 80
-    - Proxy `/api/` to backend (port 8000)
-    - Proxy `/` to frontend (port 3000)
-    - WebSocket support
-    - 60s timeouts
-
-3. `scripts/start-backend.sh`: Wrapper script for backend to activate conda environment.
-    
-    **Purpose**: PM2 cannot directly activate conda environments, so this script:
-    1. Activates conda environment `prd6`
-    2. Runs uvicorn with FastAPI
-
-## Update & Maintenance
+### Update & Maintenance
 
 Update Application Code:
 
@@ -172,6 +139,32 @@ tar -czf backup-$(date +%Y%m%d).tar.gz \
   frontend/.env.local \
   backend/.env
 ```
+
+## Configuration Files
+
+1. `ecosystem.config.js`: PM2 configuration for both frontend and backend.
+    
+    **Key Settings**:
+    - Frontend: npm start on port 3000
+    - Backend: wrapper script with conda environment
+    - Auto-restart enabled
+    - Memory limit: 1GB each
+    - Logs in `/home/ubuntu/tim6_prd_workdir/logs/`
+
+2. `nginx.conf`: Nginx reverse proxy configuration.
+    
+    **Key Settings**:
+    - Listen on port 80
+    - Proxy `/api/` to backend (port 8000)
+    - Proxy `/` to frontend (port 3000)
+    - WebSocket support
+    - 60s timeouts
+
+3. `scripts/start-backend.sh`: Wrapper script for backend to activate conda environment.
+    
+    **Purpose**: PM2 cannot directly activate conda environments, so this script:
+    1. Activates conda environment `prd6`
+    2. Runs uvicorn with FastAPI
 
 ## Monitoring
 
@@ -258,29 +251,14 @@ pkill -f "next-server"
 pkill -f "uvicorn"
 ```
 
-## Database Guides
+## Other Guides
 
-See [Database Setup](guides/database_setup.md)
-
-## Common Issues & Solutions
-
-See [Troubleshooting](guides/troubleshooting.md)
-
-## Helper Scripts
-
-See [Helper Scripts](guides/helper_scripts.md)
-
-## Command Reference
-
-See [Command Reference](guides/command_reference.md)
-
-## Best Practices
-
-See [Best Practices](guides/best_practices.md)
-
-## Deployment Checklist
-
-See [Deployment Checklist](guides/deployment_checklist.md)
+- [Database Setup](guides/database_setup.md)
+- [Troubleshooting](guides/troubleshooting.md)
+- [Helper Scripts](guides/helper_scripts.md)
+- [Command Reference](guides/command_reference.md)
+- [Best Practices](guides/best_practices.md)
+- [Deployment Checklist](guides/deployment_checklist.md)
 
 ## Important Notes
 
@@ -292,29 +270,19 @@ See [Deployment Checklist](guides/deployment_checklist.md)
 
 2. **Ensure environment variables** are set correctly in `frontend/.env.local`
 
-3. **Use development mode** for active development (hot-reload)
+3. **Use local development mode** for active development (hot-reload) and testing performance and production behavior
 
-4. **Use production mode** for testing performance and production behavior
-
-5. **Always activate conda environment** before running backend:
+4. **Always activate conda environment** before running backend:
    ```bash
    conda activate prd6
    ```
 
-6. **Never use `sudo nginx` without `-c` flag** - it will use default config instead of custom config
+5. **Never use `sudo nginx` without `-c` flag** - it will use default config instead of custom config
 
-7. **Use relative URLs** in frontend `.env.local` for public deployment:
+6. **Use relative URLs** in frontend `.env.local` for public deployment:
    ```
    NEXT_PUBLIC_API_URL=
    ```
-
-## Security Notes
-
-1. **Environment Variables**: Never commit `.env` files to git
-2. **Nginx Logs**: Regularly rotate logs to prevent disk space issues
-3. **PM2 Logs**: Configure log rotation with `pm2-logrotate`
-4. **Firewall**: Only expose necessary ports (80, 443)
-5. **Updates**: Keep dependencies updated regularly
 
 ## Support & Resources
 

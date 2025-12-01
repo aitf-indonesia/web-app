@@ -1,6 +1,6 @@
 # PRD Analyst
 
-AI-powered dashboard for Pengawasan Ruang Digital (PRD) analysis with intelligent chatbot.
+Pengawasan Ruang Digital (PRD) Analyst is a monitoring system designed to detect, verify, and block online-gambling content across websites, social media, and public reports using AI-powered classification with human-in-the-loop validation.
 
 **Public URL**: https://p5of745zrn7l3a-80.proxy.runpod.net/
 
@@ -18,6 +18,21 @@ RunPod Proxy: https://p5of745zrn7l3a-80.proxy.runpod.net/
 Container Port 80 → Nginx (Reverse Proxy)
     ├─ /api/ → Backend (Port 8000) - FastAPI
     └─ /     → Frontend (Port 3000) - Next.js
+```
+
+## Project Structure
+
+```
+tim6_prd_workdir/
+├── frontend/              # Next.js application
+├── backend/               # FastAPI application
+├── scripts/               # Deployment & utility scripts
+├── guides/                # Documentation guides
+├── ecosystem.config.js    # PM2 configuration
+├── nginx.conf             # Nginx configuration
+├── setup.sh               # Setup script
+├── GUIDES.md              # Complete documentation
+└── README.md              # This file
 ```
 
 ## Tech Stack
@@ -56,26 +71,6 @@ Container Port 80 → Nginx (Reverse Proxy)
 ### Database & Storage
 - **PostgreSQL** 14 - Primary database
 - Local file storage for screenshots and assets
-
-## Project Structure
-
-```
-tim6_prd_workdir/
-├── frontend/              # Next.js application
-├── backend/               # FastAPI application
-├── scripts/               # Deployment & utility scripts
-│   ├── deploy.sh
-│   ├── update-app.sh
-│   ├── restart-nginx.sh
-│   ├── start-dev.sh
-│   └── stop-dev.sh
-├── guides/                # Documentation guides
-├── ecosystem.config.js    # PM2 configuration
-├── nginx.conf             # Nginx configuration
-├── setup-native-vps.sh    # VPS setup script
-├── GUIDES.md              # Complete documentation
-└── README.md              # This file
-```
 
 **Last Updated**: 2025-12-01  
 **Team**: PRD Analyst Team - AITF Universitas Brawijaya 2025
