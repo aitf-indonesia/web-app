@@ -53,6 +53,7 @@ cd "$BACKEND_DIR"
 # Set FRONTEND_URL for local development (always 3001)
 # Port 3000 is reserved for actual deployment
 export FRONTEND_URL="http://localhost:3001"
+export NEXT_PUBLIC_API_URL="http://localhost:8001"
 
 uvicorn main:app --reload --host 0.0.0.0 --port $BACKEND_PORT > /tmp/backend-$MODE.log 2>&1 &
 BACKEND_PID=$!

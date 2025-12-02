@@ -22,6 +22,8 @@ def get_all_data(db: Session = Depends(get_db)):
                 r.label_final,
                 r.final_confidence,
                 r.created_at,
+                r.modified_by,
+                r.modified_at,
                 gd.status,
                 gd.date_generated
             FROM results r
@@ -37,9 +39,9 @@ def get_all_data(db: Session = Depends(get_db)):
             keywords = row.get("keywords") or ""
             jenis = keywords.split(",")[0].strip().title() if keywords else "Judi"
             
-            # Convert confidence from decimal (0-1) to percentage (0-100)
-            confidence_decimal = float(row.get("final_confidence")) if row.get("final_confidence") else 0.90
-            kepercayaan = round(confidence_decimal * 100)
+            # Confidence is already in percentage (0-100) in DB
+            confidence_val = float(row.get("final_confidence")) if row.get("final_confidence") else 90.0
+            kepercayaan = round(confidence_val)
             
             formatted.append({
                 "id": row["id_results"],
@@ -51,13 +53,13 @@ def get_all_data(db: Session = Depends(get_db)):
                     row.get("created_at").isoformat()
                     if row.get("created_at")
                     else datetime.utcnow().isoformat()
-                        ),
-                "lastModified": (
-                    row.get("date_generated").isoformat()
-                    if row.get("date_generated")
-                    else datetime.utcnow().isoformat()
                 ),
-                "modifiedBy": "admin",  # Default value for all records
+                "lastModified": (
+                    row.get("modified_at").isoformat()
+                    if row.get("modified_at")
+                    else (row.get("date_generated").isoformat() if row.get("date_generated") else datetime.utcnow().isoformat())
+                ),
+                "modifiedBy": row.get("modified_by") or "-",
                 "reasoning": row.get("reasoning_text") or "-",
                 "image": row.get("image_final_path") or "",
                 "flagged": False  # Default value since column doesn't exist
