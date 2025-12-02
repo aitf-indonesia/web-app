@@ -73,19 +73,9 @@ Development Mode:
 
 ```bash
 # Start application in development mode
-scripts/start-dev.sh dev
+scripts/start-dev.sh
 
 # Stop when done
-scripts/stop-dev.sh
-```
-
-Production Testing:
-
-```bash
-# Build and run in production mode
-scripts/start-dev.sh prod
-
-# Stop application
 scripts/stop-dev.sh
 ```
 
