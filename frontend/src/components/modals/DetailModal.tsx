@@ -161,20 +161,23 @@ export default function DetailModal({
       if (!res.ok) {
         console.error("Update status failed:", res.status, json)
         alert("Gagal update status. Cek console (Network) untuk detail.")
+        setLoading(false)
         return
       }
 
+      // Close modal immediately for better UX
+      onClose()
+
+      // Update history and refresh data in background
       await mutateHistory()
       try {
         onMutate()
       } catch (err) {
         console.warn("onMutate failed or not provided:", err)
       }
-      onClose()
     } catch (err) {
       console.error("Network error updateStatus:", err)
       alert("Kesalahan jaringan saat mengupdate status.")
-    } finally {
       setLoading(false)
     }
   }

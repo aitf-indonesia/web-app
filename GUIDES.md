@@ -246,6 +246,7 @@ pkill -f "uvicorn"
 
 - [Database Setup](guides/database_setup.md)
 - [Data Management](guides/data_management.md)
+- [Connect Local PgAdmin](guides/connect_local_pgadmin.md)
 - [Troubleshooting](guides/troubleshooting.md)
 - [Helper Scripts](guides/helper_scripts.md)
 - [Command Reference](guides/command_reference.md)
