@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import useSWR from "swr"
+import useSWR, { mutate as globalMutate } from "swr"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/Button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/Dialog"
@@ -10,8 +10,9 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import DataTable from "./DataTable"
 import { LinkRecord, Status } from "@/types/linkRecord"
+import { apiPost, apiGet, apiPut, apiDelete } from "@/lib/api"
 
-const fetcher = (url: string) => fetch(url, { cache: "no-store" }).then((r) => r.json())
+const fetcher = async (url: string) => await apiGet(url)
 
 function formatDate(d: string | Date) {
   const date = new Date(d)
@@ -86,10 +87,21 @@ export default function DetailModal({
   }, [item])
 
   const { data: history, mutate: mutateHistory } = useSWR<{ events: { time: string; text: string }[] }>(
-    item ? `${process.env.NEXT_PUBLIC_API_URL}/api/history?id=${item.id}` : null,
+    item ? `/api/history?id=${item.id}` : null,
     fetcher,
     { refreshInterval: 0, revalidateOnFocus: false }
   )
+
+  // Notes state and fetching
+  type Note = { id: number; id_domain: number; note_text: string; created_by: string; created_at: string; updated_at: string }
+  const { data: notes, mutate: mutateNotes } = useSWR<Note[]>(
+    item ? `/api/notes/${item.id}` : null,
+    fetcher,
+    { refreshInterval: 0, revalidateOnFocus: true }
+  )
+  const [newNote, setNewNote] = useState("")
+  const [editingNote, setEditingNote] = useState<Note | null>(null)
+  const [editNoteText, setEditNoteText] = useState("")
 
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -146,24 +158,12 @@ export default function DetailModal({
     if (!item) return
     setLoading(true)
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/update/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: item.id,
-          patch: { status: next },
-        }),
+      const data = await apiPost("/api/update/", {
+        id: item.id,
+        patch: { status: next },
       })
 
-      const json = await res.json().catch(() => null)
-      console.log("[updateStatus] response:", res.status, json)
-
-      if (!res.ok) {
-        console.error("Update status failed:", res.status, json)
-        alert("Gagal update status. Cek console (Network) untuk detail.")
-        setLoading(false)
-        return
-      }
+      console.log("[updateStatus] response:", data)
 
       // Close modal immediately for better UX
       onClose()
@@ -175,12 +175,13 @@ export default function DetailModal({
       } catch (err) {
         console.warn("onMutate failed or not provided:", err)
       }
-    } catch (err) {
-      console.error("Network error updateStatus:", err)
-      alert("Kesalahan jaringan saat mengupdate status.")
+    } catch (err: any) {
+      console.error("Update status failed:", err)
+      alert(`Gagal update status: ${err.message || "Unknown error"}`)
       setLoading(false)
     }
   }
+
 
   async function toggleFlag() {
     if (!item) return
@@ -188,23 +189,12 @@ export default function DetailModal({
     setFlaggedLocal(nextVal)
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/update/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: item.id,
-          patch: { flagged: nextVal },
-        }),
+      const data = await apiPost("/api/update/", {
+        id: item.id,
+        patch: { flagged: nextVal },
       })
-      const json = await res.json().catch(() => null)
-      console.log("[toggleFlag] response:", res.status, json)
 
-      if (!res.ok) {
-        console.error("Toggle flag failed:", res.status, json)
-        setFlaggedLocal(!nextVal)
-        alert("Gagal mengubah flag. Cek console.")
-        return
-      }
+      console.log("[toggleFlag] response:", data)
 
       await mutateHistory()
       try {
@@ -212,10 +202,56 @@ export default function DetailModal({
       } catch (err) {
         console.warn("onMutate failed or not provided:", err)
       }
-    } catch (err) {
-      console.error("Network error toggleFlag:", err)
+    } catch (err: any) {
+      console.error("Toggle flag failed:", err)
       setFlaggedLocal(!nextVal)
-      alert("Kesalahan jaringan saat mengubah flag.")
+      alert(`Gagal mengubah flag: ${err.message || "Unknown error"}`)
+    }
+  }
+
+  // Notes functions
+  async function handleAddNote() {
+    if (!item || !newNote.trim()) return
+    setLoading(true)
+
+    try {
+      await apiPost(`/api/notes/${item.id}`, { note_text: newNote })
+      setNewNote("")
+      mutateNotes()
+    } catch (err: any) {
+      alert(`Gagal menambahkan catatan: ${err.message || "Unknown error"}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleUpdateNote() {
+    if (!editingNote || !editNoteText.trim()) return
+    setLoading(true)
+
+    try {
+      await apiPut(`/api/notes/${editingNote.id}`, { note_text: editNoteText })
+      setEditingNote(null)
+      setEditNoteText("")
+      mutateNotes()
+    } catch (err: any) {
+      alert(`Gagal mengupdate catatan: ${err.message || "Unknown error"}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleDeleteNote(noteId: number) {
+    if (!confirm("Hapus catatan ini?")) return
+    setLoading(true)
+
+    try {
+      await apiDelete(`/api/notes/${noteId}`)
+      mutateNotes()
+    } catch (err: any) {
+      alert(`Gagal menghapus catatan: ${err.message || "Unknown error"}`)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -321,6 +357,93 @@ export default function DetailModal({
                 alt="Hasil deteksi gambar"
                 className="rounded-md mx-auto w-full max-w-md h-auto object-contain border"
               />
+            </div>
+
+            {/* Catatan */}
+            <div>
+              <div className="text-xs font-semibold mb-2">Catatan</div>
+              <div className="border border-border rounded-md p-3 bg-card space-y-2">
+                {/* Existing notes */}
+                {notes && notes.length > 0 ? (
+                  <div className="space-y-2 max-h-40 overflow-auto mb-2">
+                    {notes.map((note) => (
+                      <div key={note.id} className="border-b pb-2 last:border-b-0">
+                        {editingNote?.id === note.id ? (
+                          <div className="space-y-2">
+                            <textarea
+                              className="w-full p-2 border rounded text-xs"
+                              value={editNoteText}
+                              onChange={(e) => setEditNoteText(e.target.value)}
+                              rows={2}
+                            />
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={handleUpdateNote} disabled={loading}>
+                                Save
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingNote(null)
+                                  setEditNoteText("")
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="text-xs mb-1">{note.note_text}</div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-foreground/50">
+                                {note.created_by} · {new Date(note.created_at).toLocaleString()}
+                              </span>
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={() => {
+                                    setEditingNote(note)
+                                    setEditNoteText(note.note_text)
+                                  }}
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={() => handleDeleteNote(note.id)}
+                                >
+                                  Delete
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-foreground/60 mb-2">Belum ada catatan</div>
+                )}
+
+                {/* Add new note */}
+                <div className="space-y-2">
+                  <textarea
+                    className="w-full p-2 border rounded text-xs"
+                    placeholder="Tambahkan catatan..."
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    rows={2}
+                  />
+                  <Button size="sm" onClick={handleAddNote} disabled={loading || !newNote.trim()}>
+                    Tambah Catatan
+                  </Button>
+                </div>
+              </div>
             </div>
 
             {/* Riwayat */}
