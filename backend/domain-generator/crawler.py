@@ -90,46 +90,62 @@ def load_seen_domains():
 
 
 def load_blocked_domains():
-    """Load blocked domains from file into global set."""
+    """Load blocked domains from database into global set."""
     global BLOCKED_DOMAINS
     BLOCKED_DOMAINS = set()
     
-    # Convert relative path to absolute
-    blocked_file = os.path.abspath(BLOCKED_DOMAINS_FILE)
-    
-    if os.path.exists(blocked_file):
-        try:
-            with open(blocked_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    domain = line.strip()
-                    if domain:
-                        BLOCKED_DOMAINS.add(domain)
-            print(f"[INFO] Loaded {len(BLOCKED_DOMAINS)} blocked domains")
-        except Exception as e:
-            print(f"[WARNING] Failed to load blocked domains: {str(e)}")
-    else:
-        print(f"[WARNING] Blocked domains file not found. Continuing without blocked list.")
+    try:
+        with engine.begin() as conn:
+            query = text("""
+                SELECT setting_value
+                FROM generator_settings
+                WHERE setting_key = 'blocked_domains'
+            """)
+            result = conn.execute(query).fetchone()
+            
+            if result:
+                setting_value = dict(result._mapping)["setting_value"]
+                if setting_value:
+                    # Split by newlines and filter empty lines
+                    domains = [line.strip() for line in setting_value.split('\n') if line.strip()]
+                    BLOCKED_DOMAINS = set(domains)
+                    print(f"[INFO] Loaded {len(BLOCKED_DOMAINS)} blocked domains from database")
+                else:
+                    print(f"[INFO] No blocked domains found in database")
+            else:
+                print(f"[INFO] No blocked domains setting in database")
+    except Exception as e:
+        print(f"[WARNING] Failed to load blocked domains from database: {str(e)}")
+        print(f"[INFO] Continuing without blocked domains")
 
 
 def load_blocked_keywords():
-    """Load blocked keywords from file and return as list."""
+    """Load blocked keywords from database and return as list."""
     blocked_keywords = []
     
-    # Convert relative path to absolute
-    blocked_file = os.path.abspath(BLOCKED_KEYWORDS_FILE)
-    
-    if os.path.exists(blocked_file):
-        try:
-            with open(blocked_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    keyword = line.strip()
-                    if keyword:
-                        blocked_keywords.append(keyword)
-            print(f"[INFO] Loaded {len(blocked_keywords)} blocked keywords")
-        except Exception as e:
-            print(f"[WARNING] Failed to load blocked keywords: {str(e)}")
-    else:
-        print(f"[INFO] No blocked keywords file found. Continuing without keyword exclusions.")
+    try:
+        with engine.begin() as conn:
+            query = text("""
+                SELECT setting_value
+                FROM generator_settings
+                WHERE setting_key = 'blocked_keywords'
+            """)
+            result = conn.execute(query).fetchone()
+            
+            if result:
+                setting_value = dict(result._mapping)["setting_value"]
+                if setting_value:
+                    # Split by newlines and filter empty lines
+                    keywords = [line.strip() for line in setting_value.split('\n') if line.strip()]
+                    blocked_keywords = keywords
+                    print(f"[INFO] Loaded {len(blocked_keywords)} blocked keywords from database")
+                else:
+                    print(f"[INFO] No blocked keywords found in database")
+            else:
+                print(f"[INFO] No blocked keywords setting in database")
+    except Exception as e:
+        print(f"[WARNING] Failed to load blocked keywords from database: {str(e)}")
+        print(f"[INFO] Continuing without blocked keywords")
     
     return blocked_keywords
 

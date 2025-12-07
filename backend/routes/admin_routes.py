@@ -1,0 +1,498 @@
+"""
+Admin routes for administrator-only operations
+"""
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+from pydantic import BaseModel
+from typing import Optional, List
+from db import get_db
+from utils.auth_middleware import get_current_user, require_role
+from utils.auth import get_password_hash
+import os
+
+router = APIRouter(prefix="/api/admin", tags=["Admin"])
+
+# ============================================================
+# Pydantic Models
+# ============================================================
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    full_name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+
+class UserUpdate(BaseModel):
+    password: Optional[str] = None
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    full_name: str
+    email: Optional[str]
+    phone: Optional[str]
+    role: str
+    created_at: str
+    last_login: Optional[str]
+
+class GeneratorSettingsUpdate(BaseModel):
+    value: str
+
+# ============================================================
+# User Management Endpoints
+# ============================================================
+
+@router.get("/users", response_model=List[UserResponse])
+async def list_users(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("administrator"))
+):
+    """
+    List all verifikator users.
+    Only accessible by administrators.
+    """
+    try:
+        query = text("""
+            SELECT id, username, full_name, email, phone, role, created_at, last_login
+            FROM users
+            WHERE role = 'verifikator'
+            ORDER BY created_at DESC
+        """)
+        
+        result = db.execute(query)
+        users = []
+        
+        for row in result:
+            user_dict = dict(row._mapping)
+            users.append({
+                "id": user_dict["id"],
+                "username": user_dict["username"],
+                "full_name": user_dict["full_name"],
+                "email": user_dict["email"],
+                "phone": user_dict["phone"],
+                "role": user_dict["role"],
+                "created_at": user_dict["created_at"].isoformat() if user_dict["created_at"] else None,
+                "last_login": user_dict["last_login"].isoformat() if user_dict["last_login"] else None,
+            })
+        
+        return users
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch users: {str(e)}")
+
+
+@router.post("/users", response_model=UserResponse)
+async def create_user(
+    user_data: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("administrator"))
+):
+    """
+    Create a new verifikator user.
+    Only accessible by administrators.
+    """
+    try:
+        # Check if username already exists
+        check_query = text("SELECT id FROM users WHERE username = :username")
+        existing = db.execute(check_query, {"username": user_data.username}).fetchone()
+        
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already exists"
+            )
+        
+        # Hash password
+        password_hash = get_password_hash(user_data.password)
+        
+        # Insert new user
+        insert_query = text("""
+            INSERT INTO users (username, password_hash, full_name, email, phone, role, created_at)
+            VALUES (:username, :password_hash, :full_name, :email, :phone, 'verifikator', now())
+            RETURNING id, username, full_name, email, phone, role, created_at, last_login
+        """)
+        
+        result = db.execute(insert_query, {
+            "username": user_data.username,
+            "password_hash": password_hash,
+            "full_name": user_data.full_name,
+            "email": user_data.email,
+            "phone": user_data.phone
+        })
+        
+        db.commit()
+        row = result.fetchone()
+        user_dict = dict(row._mapping)
+        
+        return {
+            "id": user_dict["id"],
+            "username": user_dict["username"],
+            "full_name": user_dict["full_name"],
+            "email": user_dict["email"],
+            "phone": user_dict["phone"],
+            "role": user_dict["role"],
+            "created_at": user_dict["created_at"].isoformat() if user_dict["created_at"] else None,
+            "last_login": user_dict["last_login"].isoformat() if user_dict["last_login"] else None,
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create user: {str(e)}")
+
+
+@router.put("/users/{user_id}", response_model=UserResponse)
+async def update_user(
+    user_id: int,
+    user_data: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("administrator"))
+):
+    """
+    Update a verifikator user.
+    Only accessible by administrators.
+    """
+    try:
+        # Check if user exists and is verifikator
+        check_query = text("SELECT id, role FROM users WHERE id = :user_id")
+        existing = db.execute(check_query, {"user_id": user_id}).fetchone()
+        
+        if not existing:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        if dict(existing._mapping)["role"] != "verifikator":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Can only modify verifikator users"
+            )
+        
+        # Build update query dynamically
+        update_parts = []
+        params = {"user_id": user_id}
+        
+        if user_data.password is not None:
+            update_parts.append("password_hash = :password_hash")
+            params["password_hash"] = get_password_hash(user_data.password)
+        
+        if user_data.full_name is not None:
+            update_parts.append("full_name = :full_name")
+            params["full_name"] = user_data.full_name
+        
+        if user_data.email is not None:
+            update_parts.append("email = :email")
+            params["email"] = user_data.email
+        
+        if user_data.phone is not None:
+            update_parts.append("phone = :phone")
+            params["phone"] = user_data.phone
+        
+        if not update_parts:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        
+        update_query = text(f"""
+            UPDATE users
+            SET {", ".join(update_parts)}
+            WHERE id = :user_id
+            RETURNING id, username, full_name, email, phone, role, created_at, last_login
+        """)
+        
+        result = db.execute(update_query, params)
+        db.commit()
+        
+        row = result.fetchone()
+        user_dict = dict(row._mapping)
+        
+        return {
+            "id": user_dict["id"],
+            "username": user_dict["username"],
+            "full_name": user_dict["full_name"],
+            "email": user_dict["email"],
+            "phone": user_dict["phone"],
+            "role": user_dict["role"],
+            "created_at": user_dict["created_at"].isoformat() if user_dict["created_at"] else None,
+            "last_login": user_dict["last_login"].isoformat() if user_dict["last_login"] else None,
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update user: {str(e)}")
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("administrator"))
+):
+    """
+    Delete a verifikator user.
+    Only accessible by administrators.
+    """
+    try:
+        # Check if user exists and is verifikator
+        check_query = text("SELECT id, role FROM users WHERE id = :user_id")
+        existing = db.execute(check_query, {"user_id": user_id}).fetchone()
+        
+        if not existing:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        if dict(existing._mapping)["role"] != "verifikator":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Can only delete verifikator users"
+            )
+        
+        # Delete user
+        delete_query = text("DELETE FROM users WHERE id = :user_id")
+        db.execute(delete_query, {"user_id": user_id})
+        db.commit()
+        
+        return {"ok": True, "message": "User deleted successfully"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete user: {str(e)}")
+
+
+# ============================================================
+# Generator Settings Endpoints
+# ============================================================
+
+@router.get("/generator/blocked-domains")
+async def get_blocked_domains(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("administrator"))
+):
+    """
+    Get blocked domains list.
+    Only accessible by administrators.
+    """
+    try:
+        query = text("""
+            SELECT setting_value, updated_by, updated_at
+            FROM generator_settings
+            WHERE setting_key = 'blocked_domains'
+        """)
+        
+        result = db.execute(query).fetchone()
+        
+        if result:
+            row_dict = dict(result._mapping)
+            return {
+                "value": row_dict["setting_value"],
+                "updated_by": row_dict["updated_by"],
+                "updated_at": row_dict["updated_at"].isoformat() if row_dict["updated_at"] else None
+            }
+        else:
+            return {"value": "", "updated_by": None, "updated_at": None}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch blocked domains: {str(e)}")
+
+
+@router.post("/generator/blocked-domains")
+async def update_blocked_domains(
+    settings_data: GeneratorSettingsUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("administrator"))
+):
+    """
+    Update blocked domains list.
+    Only accessible by administrators.
+    """
+    try:
+        username = current_user.get("username")
+        
+        query = text("""
+            INSERT INTO generator_settings (setting_key, setting_value, updated_by, updated_at)
+            VALUES ('blocked_domains', :value, :username, now())
+            ON CONFLICT (setting_key) DO UPDATE SET
+                setting_value = EXCLUDED.setting_value,
+                updated_by = EXCLUDED.updated_by,
+                updated_at = EXCLUDED.updated_at
+            RETURNING setting_value, updated_by, updated_at
+        """)
+        
+        result = db.execute(query, {
+            "value": settings_data.value,
+            "username": username
+        })
+        db.commit()
+        
+        row = result.fetchone()
+        row_dict = dict(row._mapping)
+        
+        return {
+            "ok": True,
+            "value": row_dict["setting_value"],
+            "updated_by": row_dict["updated_by"],
+            "updated_at": row_dict["updated_at"].isoformat() if row_dict["updated_at"] else None
+        }
+    
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update blocked domains: {str(e)}")
+
+
+@router.get("/generator/blocked-keywords")
+async def get_blocked_keywords(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("administrator"))
+):
+    """
+    Get blocked keywords list.
+    Only accessible by administrators.
+    """
+    try:
+        query = text("""
+            SELECT setting_value, updated_by, updated_at
+            FROM generator_settings
+            WHERE setting_key = 'blocked_keywords'
+        """)
+        
+        result = db.execute(query).fetchone()
+        
+        if result:
+            row_dict = dict(result._mapping)
+            return {
+                "value": row_dict["setting_value"],
+                "updated_by": row_dict["updated_by"],
+                "updated_at": row_dict["updated_at"].isoformat() if row_dict["updated_at"] else None
+            }
+        else:
+            return {"value": "", "updated_by": None, "updated_at": None}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch blocked keywords: {str(e)}")
+
+
+@router.post("/generator/blocked-keywords")
+async def update_blocked_keywords(
+    settings_data: GeneratorSettingsUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("administrator"))
+):
+    """
+    Update blocked keywords list.
+    Only accessible by administrators.
+    """
+    try:
+        username = current_user.get("username")
+        
+        query = text("""
+            INSERT INTO generator_settings (setting_key, setting_value, updated_by, updated_at)
+            VALUES ('blocked_keywords', :value, :username, now())
+            ON CONFLICT (setting_key) DO UPDATE SET
+                setting_value = EXCLUDED.setting_value,
+                updated_by = EXCLUDED.updated_by,
+                updated_at = EXCLUDED.updated_at
+            RETURNING setting_value, updated_by, updated_at
+        """)
+        
+        result = db.execute(query, {
+            "value": settings_data.value,
+            "username": username
+        })
+        db.commit()
+        
+        row = result.fetchone()
+        row_dict = dict(row._mapping)
+        
+        return {
+            "ok": True,
+            "value": row_dict["setting_value"],
+            "updated_by": row_dict["updated_by"],
+            "updated_at": row_dict["updated_at"].isoformat() if row_dict["updated_at"] else None
+        }
+    
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update blocked keywords: {str(e)}")
+
+
+# ============================================================
+# Domain Management Endpoints
+# ============================================================
+
+@router.delete("/domains/all")
+async def delete_all_domains(
+    confirmation: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("administrator"))
+):
+    """
+    Delete all domains from the database.
+    Requires confirmation string "konfirmasi".
+    Only accessible by administrators.
+    """
+    if confirmation != "konfirmasi":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid confirmation. Please type 'konfirmasi' to confirm deletion."
+        )
+    
+    try:
+        # Count domains before deletion
+        count_query = text("SELECT COUNT(*) as count FROM generated_domains")
+        count_result = db.execute(count_query).fetchone()
+        total_domains = dict(count_result._mapping)["count"]
+        
+        # Delete all domains (cascade will handle related tables)
+        delete_query = text("DELETE FROM generated_domains")
+        db.execute(delete_query)
+        db.commit()
+        
+        return {
+            "ok": True,
+            "message": f"Successfully deleted {total_domains} domains",
+            "deleted_count": total_domains
+        }
+    
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete all domains: {str(e)}")
+
+
+@router.delete("/domains/{id_domain}")
+async def delete_domain_by_id(
+    id_domain: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("administrator"))
+):
+    """
+    Delete a specific domain by ID.
+    Only accessible by administrators.
+    """
+    try:
+        # Check if domain exists
+        check_query = text("SELECT id_domain FROM generated_domains WHERE id_domain = :id_domain")
+        existing = db.execute(check_query, {"id_domain": id_domain}).fetchone()
+        
+        if not existing:
+            raise HTTPException(status_code=404, detail="Domain not found")
+        
+        # Delete domain (cascade will handle related tables)
+        delete_query = text("DELETE FROM generated_domains WHERE id_domain = :id_domain")
+        db.execute(delete_query, {"id_domain": id_domain})
+        db.commit()
+        
+        return {
+            "ok": True,
+            "message": f"Successfully deleted domain with ID {id_domain}"
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete domain: {str(e)}")

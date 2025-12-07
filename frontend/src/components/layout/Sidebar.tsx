@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/AuthContext"
 import { Button } from "@/components/ui/Button"
 import { cn } from "@/lib/utils"
 import {
@@ -18,9 +20,12 @@ import {
   BarChart3,
   Moon,
   Sun,
+  Settings,
 } from "lucide-react"
 
 export default function Sidebar({ activeTab, setActiveTab, tabs, onLogout }: any) {
+  const router = useRouter()
+  const { user } = useAuth()
   const [openProfileMenu, setOpenProfileMenu] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
@@ -79,67 +84,67 @@ export default function Sidebar({ activeTab, setActiveTab, tabs, onLogout }: any
         )}
       >
         {/* Header profil kiri atas */}
-<div
-  className={cn(
-    "border-b border-border flex items-center justify-between relative",
-    isCollapsed ? "px-2 py-3" : "p-4"
-  )}
->
-  {!isCollapsed && (
-    <div
-      className="flex items-center gap-2 cursor-pointer"
-      onClick={() => setOpenProfileMenu(!openProfileMenu)}
-    >
-      <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-white font-semibold">
-        P
-      </div>
-      <div className="flex flex-col">
-        <h1 className="text-sm font-semibold">PRD Analyst</h1>
-        <span className="text-xs text-muted-foreground">Administrator</span>
-      </div>
-      <ChevronDown
-        className={cn(
-          "w-4 h-4 text-muted-foreground ml-1 transition-transform",
-          openProfileMenu && "rotate-180"
-        )}
-      />
-    </div>
-  )}
+        <div
+          className={cn(
+            "border-b border-border flex items-center justify-between relative",
+            isCollapsed ? "px-2 py-3" : "p-4"
+          )}
+        >
+          {!isCollapsed && (
+            <div
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={() => setOpenProfileMenu(!openProfileMenu)}
+            >
+              <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-white font-semibold">
+                P
+              </div>
+              <div className="flex flex-col">
+                <h1 className="text-sm font-semibold">PRD Analyst</h1>
+                <span className="text-xs text-muted-foreground">Administrator</span>
+              </div>
+              <ChevronDown
+                className={cn(
+                  "w-4 h-4 text-muted-foreground ml-1 transition-transform",
+                  openProfileMenu && "rotate-180"
+                )}
+              />
+            </div>
+          )}
 
-  {/* Tombol collapse (selalu sejajar) */}
-  <Button
-    size="icon"
-    variant="ghost"
-    className={cn(
-      "transition-all",
-      isCollapsed ? "ml-auto" : "absolute right-2"
-    )}
-    onClick={() => setIsCollapsed(!isCollapsed)}
-    aria-label="Collapse Sidebar"
-  >
-    {isCollapsed ? (
-      <ChevronRight className="h-4 w-4" />
-    ) : (
-      <ChevronLeft className="h-4 w-4" />
-    )}
-  </Button>
+          {/* Tombol collapse (selalu sejajar) */}
+          <Button
+            size="icon"
+            variant="ghost"
+            className={cn(
+              "transition-all",
+              isCollapsed ? "ml-auto" : "absolute right-2"
+            )}
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            aria-label="Collapse Sidebar"
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </Button>
 
-  {/* Dropdown profil */}
-  {openProfileMenu && !isCollapsed && (
-    <div className="absolute top-[calc(100%+0.5rem)] left-4 bg-popover border border-border rounded-md shadow-md w-48 z-50 animate-in fade-in slide-in-from-top-1">
-      <button
-        onClick={() => {
-          setOpenProfileMenu(false)
-          onLogout()
-        }}
-        className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm hover:bg-muted transition"
-      >
-        <LogOut className="w-4 h-4" />
-        Logout
-      </button>
-    </div>
-  )}
-</div>
+          {/* Dropdown profil */}
+          {openProfileMenu && !isCollapsed && (
+            <div className="absolute top-[calc(100%+0.5rem)] left-4 bg-popover border border-border rounded-md shadow-md w-48 z-50 animate-in fade-in slide-in-from-top-1">
+              <button
+                onClick={() => {
+                  setOpenProfileMenu(false)
+                  onLogout()
+                }}
+                className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm hover:bg-muted transition"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
 
 
         {/* Navigasi tab */}
@@ -168,6 +173,28 @@ export default function Sidebar({ activeTab, setActiveTab, tabs, onLogout }: any
               </button>
             )
           })}
+
+          {/* Admin Panel Link - Only for administrators */}
+          {user?.role === "administrator" && (
+            <>
+              <div className="border-t border-border my-2" />
+              <button
+                onClick={() => {
+                  router.push("/admin")
+                  setIsMobileOpen(false)
+                }}
+                title={isCollapsed ? "Admin Panel" : undefined}
+                className={cn(
+                  "flex items-center gap-2 w-full px-3 py-2 rounded-md text-sm transition",
+                  "hover:bg-muted/60 text-foreground/80",
+                  isCollapsed && "justify-center px-2"
+                )}
+              >
+                <Settings className="h-4 w-4" />
+                {!isCollapsed && "Admin Panel"}
+              </button>
+            </>
+          )}
         </nav>
 
         {/* Footer: Dark Mode Toggle */}
