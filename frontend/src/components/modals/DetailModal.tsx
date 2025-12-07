@@ -347,16 +347,32 @@ export default function DetailModal({
               )}
               onClick={() => toggleContext("Gambar Terkait")}
             >
-              <div className="text-xs font-semibold mb-2">Gambar Terkait</div>
-              <img
-                src={
-                  item.image
-                    ? item.image
-                    : `assets/placeholder.svg?height=240&width=360&query=Gambar%20terkait%20kasus`
-                }
-                alt="Hasil deteksi gambar"
-                className="rounded-md mx-auto w-full max-w-md h-auto object-contain border"
-              />
+              <div className="text-xs font-semibold mb-2">Gambar Object Detection</div>
+              {item.image ? (
+                <img
+                  src={(() => {
+                    // Extract filename from path
+                    // Path format: ~/tim5_prd_workdir/Gambling-Pipeline/results/inference/filename.jpg
+                    const pathParts = item.image.split('/')
+                    const filename = pathParts[pathParts.length - 1]
+
+                    // Construct API URL
+                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+                    return `${apiUrl}/api/images/detection/${filename}`
+                  })()}
+                  alt="Hasil deteksi object detection"
+                  className="rounded-md mx-auto w-full max-w-md h-auto object-contain border"
+                  onError={(e) => {
+                    // Fallback to placeholder if image fails to load
+                    const target = e.target as HTMLImageElement
+                    target.src = `/assets/placeholder.svg?height=240&width=360&query=Gambar%20tidak%20tersedia`
+                  }}
+                />
+              ) : (
+                <div className="rounded-md mx-auto w-full max-w-md h-48 flex items-center justify-center border bg-muted text-muted-foreground text-sm">
+                  Tidak ada gambar object detection
+                </div>
+              )}
             </div>
 
             {/* Catatan */}
