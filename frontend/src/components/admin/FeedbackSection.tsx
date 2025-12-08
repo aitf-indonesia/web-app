@@ -75,7 +75,7 @@ export default function FeedbackSection() {
                     No feedback received yet.
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
                     {feedbackList.map((feedback) => (
                         <div
                             key={feedback.id_feedback}

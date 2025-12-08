@@ -84,37 +84,37 @@ export default function DataTable({
     <table className={cn("w-full", compactMode ? "text-xs" : "text-sm")}>
       <thead className="bg-muted text-foreground/80">
         <tr>
-          <th className={cn("px-4 text-left font-medium w-[28%]", compactMode ? "py-2" : "py-3")}>Link</th>
+          <th className={cn("px-4 text-left font-medium w-[31%]", compactMode ? "py-2" : "py-3")}>Link</th>
           <th
-            className={cn("px-4 text-left font-medium", compactMode ? "py-2" : "py-3", onSort ? 'cursor-pointer hover:bg-muted-foreground/10 select-none' : '')}
+            className={cn("px-4 text-left font-medium w-[12%]", compactMode ? "py-2" : "py-3", onSort ? 'cursor-pointer hover:bg-muted-foreground/10 select-none' : '')}
             onClick={() => onSort?.("tanggal")}
           >
             {onSort && <SortIcon column="tanggal" />}
             Tanggal
           </th>
           <th
-            className={cn("px-4 text-left font-medium", compactMode ? "py-2" : "py-3", onSort ? 'cursor-pointer hover:bg-muted-foreground/10 select-none' : '')}
+            className={cn("px-4 text-left font-medium w-[12%]", compactMode ? "py-2" : "py-3", onSort ? 'cursor-pointer hover:bg-muted-foreground/10 select-none' : '')}
             onClick={() => onSort?.("lastModified")}
           >
             {onSort && <SortIcon column="lastModified" />}
             Tgl Berubah
           </th>
           <th
-            className={cn("px-4 text-left font-medium", compactMode ? "py-2" : "py-3", onSort ? 'cursor-pointer hover:bg-muted-foreground/10 select-none' : '')}
+            className={cn("px-4 text-left font-medium w-[10%]", compactMode ? "py-2" : "py-3", onSort ? 'cursor-pointer hover:bg-muted-foreground/10 select-none' : '')}
             onClick={() => onSort?.("modifiedBy")}
           >
             {onSort && <SortIcon column="modifiedBy" />}
-            Modified By
+            Diubah Oleh
           </th>
           <th
-            className={cn("px-4 text-left font-medium", compactMode ? "py-2" : "py-3", onSort ? 'cursor-pointer hover:bg-muted-foreground/10 select-none' : '')}
+            className={cn("px-4 text-left font-medium w-[18%]", compactMode ? "py-2" : "py-3", onSort ? 'cursor-pointer hover:bg-muted-foreground/10 select-none' : '')}
             onClick={() => onSort?.("kepercayaan")}
           >
             {onSort && <SortIcon column="kepercayaan" />}
             Kepercayaan
           </th>
-          <th className={cn("px-4 text-left font-medium", compactMode ? "py-2" : "py-3")}>Status</th>
-          <th className={cn("px-4 text-left font-medium", compactMode ? "py-2" : "py-3")} />
+          <th className={cn("px-4 text-left font-medium w-[10%]", compactMode ? "py-2" : "py-3")}>Status</th>
+          <th className={cn("px-4 text-left font-medium w-[7%]", compactMode ? "py-2" : "py-3")} />
         </tr>
       </thead>
       <tbody>
@@ -140,34 +140,36 @@ export default function DataTable({
           const cellPadding = compactMode ? "py-1.5" : "py-3"
           return (
             <tr key={it.id} className="border-t border-border hover:bg-muted/40">
-              <td className={cn("px-4 font-medium", cellPadding)}>
-                <div className="flex items-center gap-1.5">
-                  {it.isNew && (
-                    <Badge className="bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] px-1.5 py-0 font-semibold">
-                      Baru
-                    </Badge>
-                  )}
-                  <div className="text-xs text-foreground/50">{toHexId(it.id)}</div>
-                  {it.flagged && (
-                    <span title="Flagged">
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        className="text-primary"
-                      >
-                        <path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z" />
-                      </svg>
-                    </span>
-                  )}
+              <td className={cn("px-4 font-medium w-[31%] max-w-0", cellPadding)}>
+                <div className="flex flex-col gap-0.5 overflow-hidden">
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {it.isNew && (
+                      <Badge className="bg-blue-900/20 text-blue-900 dark:text-blue-300 text-[10px] px-1.5 py-0 font-semibold">
+                        Baru
+                      </Badge>
+                    )}
+                    <div className="text-xs text-foreground/50">{toHexId(it.id)}</div>
+                    {it.flagged && (
+                      <span title="Flagged">
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                          className="text-primary"
+                        >
+                          <path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z" />
+                        </svg>
+                      </span>
+                    )}
+                  </div>
+                  <div className="truncate overflow-hidden text-ellipsis whitespace-nowrap" title={it.link}>{it.link}</div>
                 </div>
-                <div className="truncate max-w-[28ch]" title={it.link}>{it.link}</div>
               </td>
-              <td className={cn("px-4", cellPadding)}>{formatDateOnly(it.tanggal)}</td>
-              <td className={cn("px-4", cellPadding)}>{formatDateOnly(it.lastModified)}</td>
-              <td className={cn("px-4 text-foreground/70", cellPadding)}>{it.modifiedBy}</td>
-              <td className={cn("px-4", cellPadding)}>
+              <td className={cn("px-4 w-[12%]", cellPadding)}>{formatDateOnly(it.tanggal)}</td>
+              <td className={cn("px-4 w-[12%]", cellPadding)}>{formatDateOnly(it.lastModified)}</td>
+              <td className={cn("px-4 text-foreground/70 w-[10%]", cellPadding)}>{it.modifiedBy}</td>
+              <td className={cn("px-4 w-[18%]", cellPadding)}>
                 {it.isManual ? (
                   <div className="flex items-center gap-2">
                     <span className="w-10 text-right text-foreground/50">-</span>
@@ -184,7 +186,7 @@ export default function DataTable({
                   </div>
                 )}
               </td>
-              <td className={cn("px-4", cellPadding)}>
+              <td className={cn("px-4 w-[10%]", cellPadding)}>
                 {it.isManual ? (
                   <Badge className="bg-secondary text-foreground font-semibold">
                     Manual
@@ -195,7 +197,7 @@ export default function DataTable({
                   </Badge>
                 )}
               </td>
-              <td className={cn("px-4", cellPadding)}>
+              <td className={cn("px-4 w-[7%]", cellPadding)}>
                 <button
                   className="text-primary hover:underline font-medium"
                   onClick={() => setDetail(it)}
