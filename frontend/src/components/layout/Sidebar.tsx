@@ -101,9 +101,11 @@ export default function Sidebar({ activeTab, setActiveTab, tabs, onLogout }: any
               className="flex items-center gap-2 cursor-pointer"
               onClick={() => setOpenProfileMenu(!openProfileMenu)}
             >
-              <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-white font-semibold">
-                P
-              </div>
+              <img
+                src="/assets/logo.webp"
+                alt="PRD Analyst Logo"
+                className="h-8 w-8 object-cover"
+              />
               <div className="flex flex-col">
                 <h1 className="text-sm font-semibold text-white">PRD Analyst</h1>
                 <span className="text-xs text-white/80">{user?.username || 'User'}</span>
@@ -122,16 +124,16 @@ export default function Sidebar({ activeTab, setActiveTab, tabs, onLogout }: any
             size="icon"
             variant="ghost"
             className={cn(
-              "transition-all",
+              "transition-all hover:bg-transparent",
               isCollapsed ? "ml-auto" : "absolute right-2"
             )}
             onClick={() => setIsCollapsed(!isCollapsed)}
             aria-label="Collapse Sidebar"
           >
             {isCollapsed ? (
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-5 w-5 text-white" />
             ) : (
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-5 w-5 text-white" />
             )}
           </Button>
 
