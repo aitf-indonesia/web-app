@@ -188,14 +188,15 @@ async def delete_manual_domain(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Delete a manual domain.
-    Only the creator or administrators can delete manual domains.
+    Delete a domain.
+    - Manual domain creators can delete their own manual domains
+    - Administrators can delete any domain
     """
     try:
         username = current_user.get("username")
         user_role = current_user.get("role")
         
-        # Check if domain exists and is manual
+        # Check if domain exists
         check_query = text("""
             SELECT r.id_results, r.created_by, r.is_manual, r.url
             FROM results r
@@ -209,16 +210,22 @@ async def delete_manual_domain(
             raise HTTPException(status_code=404, detail="Domain not found")
         
         domain_data = dict(row._mapping)
-        
-        if not domain_data.get("is_manual"):
-            raise HTTPException(status_code=400, detail="Only manual domains can be deleted")
-        
-        # Check permissions: creator or administrator
+        is_manual = domain_data.get("is_manual")
         created_by = domain_data.get("created_by")
-        if username != created_by and user_role != "administrator":
+        
+        # Permission check:
+        # 1. Administrators can delete any domain
+        # 2. Manual domain creators can delete their own manual domains
+        if user_role == "administrator":
+            # Admin can delete anything
+            pass
+        elif is_manual and username == created_by:
+            # Creator can delete their own manual domain
+            pass
+        else:
             raise HTTPException(
                 status_code=403, 
-                detail="Only the creator or administrators can delete this domain"
+                detail="Only administrators or manual domain creators can delete domains"
             )
         
         # Delete from results (cascade will handle generated_domains)
@@ -230,12 +237,12 @@ async def delete_manual_domain(
         db.commit()
         
         # Add audit log
-        add_audit_log(db, domain_id, "manual_domain_deleted", username)
+        add_audit_log(db, domain_id, "domain_deleted", username)
         db.commit()
         
         return {
             "ok": True,
-            "message": f"Manual domain deleted successfully",
+            "message": f"Domain deleted successfully",
             "deleted_id": domain_id
         }
         
@@ -244,5 +251,5 @@ async def delete_manual_domain(
         raise
     except Exception as e:
         db.rollback()
-        print(f"[ERROR] Failed to delete manual domain: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete manual domain: {str(e)}")
+        print(f"[ERROR] Failed to delete domain: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete domain: {str(e)}")

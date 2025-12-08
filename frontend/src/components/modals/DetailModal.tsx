@@ -372,7 +372,8 @@ export default function DetailModal({
             >
               {flaggedLocal ? "Unflag" : "Flag"}
             </Button>
-            {item.isManual && (user?.username === item.createdBy || user?.role === "administrator") && (
+            {/* Show delete button for: 1) Manual domain creators, 2) Administrators (all domains) */}
+            {((item.isManual && user?.username === item.createdBy) || user?.role === "administrator") && (
               <Button
                 variant="destructive"
                 size="sm"
