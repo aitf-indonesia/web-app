@@ -194,7 +194,7 @@ export default function PRDDashboardPage() {
               </div>
 
               {/* Pagination */}
-              <div className="shrink-0 flex items-center justify-between text-sm pb-4">
+              <div className="shrink-0 flex items-center justify-between text-sm">
                 <PerPage value={perPage} onChange={setPerPage} />
                 <div className="flex items-center gap-2">
                   <Button
