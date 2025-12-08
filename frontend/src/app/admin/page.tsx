@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import UserManagementSection from "@/components/admin/UserManagementSection"
 import GeneratorSettingsSection from "@/components/admin/GeneratorSettingsSection"
 import DomainManagementSection from "@/components/admin/DomainManagementSection"
+import FeedbackSection from "@/components/admin/FeedbackSection"
 import { Button } from "@/components/ui/Button"
 import { useRouter } from "next/navigation"
 
@@ -46,6 +47,9 @@ export default function AdminPage() {
 
                         {/* Domain Management */}
                         <DomainManagementSection />
+
+                        {/* Feedback */}
+                        <FeedbackSection />
                     </div>
                 </main>
             </div>
