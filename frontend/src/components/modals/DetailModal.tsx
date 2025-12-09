@@ -42,39 +42,49 @@ export default function DetailModal({
 
   type ChatMsg = { role: "user" | "assistant"; text: string; ts: number; link: string }
   const [chat, setChat] = useState<ChatMsg[]>([])
-  const chatKey = item ? `prd-chat-${item.id}` : ""
 
   const [contextMode, setContextMode] = useState(false)
   const [selectedContexts, setSelectedContexts] = useState<string[]>([])
+
+  const { user } = useAuth()
 
   useEffect(() => {
     setContextMode(false)
     setSelectedContexts([])
   }, [item])
 
-  // Load chat
-  useEffect(() => {
-    if (!item) return
-    const saved = localStorage.getItem(chatKey)
-    if (saved) {
-      try {
-        setChat(JSON.parse(saved))
-        return
-      } catch { }
-    }
-    setChat([
-      {
-        role: "assistant",
-        text: "Halo, saya siap membantu menganalisis kasus ini. Apa yang ingin Anda ketahui?",
-        ts: Date.now(),
-        link: item.link,
-      },
-    ])
-  }, [chatKey, item])
+  // Fetch chat history from database
+  const { data: chatHistory, mutate: mutateChat } = useSWR<{ role: string; message: string; created_at: string }[]>(
+    item && user ? `/api/chat/history/${item.id}?username=${user.username}` : null,
+    fetcher,
+    { refreshInterval: 0, revalidateOnFocus: false }
+  )
 
+  // Load chat history from API
   useEffect(() => {
-    if (item) localStorage.setItem(chatKey, JSON.stringify(chat))
-  }, [chat, chatKey, item])
+    if (!item || !chatHistory) return
+
+    if (chatHistory.length === 0) {
+      // No chat history, show initial greeting
+      setChat([
+        {
+          role: "assistant",
+          text: "Halo, saya siap membantu menganalisis kasus ini. Apa yang ingin Anda ketahui?",
+          ts: Date.now(),
+          link: item.link,
+        },
+      ])
+    } else {
+      // Load chat history from database
+      const loadedChat = chatHistory.map((msg) => ({
+        role: msg.role as "user" | "assistant",
+        text: msg.message,
+        ts: new Date(msg.created_at).getTime(),
+        link: item.link,
+      }))
+      setChat(loadedChat)
+    }
+  }, [chatHistory, item])
 
   const [flaggedLocal, setFlaggedLocal] = useState<boolean>(!!item?.flagged)
   useEffect(() => {
@@ -100,7 +110,6 @@ export default function DetailModal({
   const [openMenuNoteId, setOpenMenuNoteId] = useState<number | null>(null)
   const [showNoteInput, setShowNoteInput] = useState(false)
   const [imageLoading, setImageLoading] = useState(true)
-  const { user } = useAuth()
 
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -116,7 +125,7 @@ export default function DetailModal({
   }
 
   async function send() {
-    if (!item) return
+    if (!item || !user) return
     const content = message.trim()
     if (!content) return
 
@@ -136,13 +145,16 @@ export default function DetailModal({
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: finalMsg, item }),
+        body: JSON.stringify({ question: finalMsg, item, username: user.username }),
       })
       const data = await res.json()
       setChat((c) => [
         ...c,
         { role: "assistant", text: data.reply ?? "Maaf, tidak ada balasan.", ts: Date.now(), link: item.link },
       ])
+
+      // Refresh chat history from database
+      mutateChat()
     } catch {
       setChat((c) => [
         ...c,

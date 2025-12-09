@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import requests
 import os
+from db import get_db_connection
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
@@ -11,13 +12,16 @@ MODEL_NAME = os.getenv("MODEL_NAME", "mistral")
 class ChatRequest(BaseModel):
     question: str
     item: dict
+    username: str
 
 
 @router.post("/chat")
 def chat(req: ChatRequest):
     """
     Endpoint untuk melakukan percakapan dengan model Mistral melalui Ollama.
+    Menyimpan pesan user dan respons AI ke database.
     """
+    conn = None
     try:
         # Bangun konteks dari data item
         context = f"""
@@ -38,6 +42,18 @@ def chat(req: ChatRequest):
             "stream": False,
         }
 
+        # Simpan pesan user ke database
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        id_domain = req.item.get('id')
+        if id_domain:
+            cur.execute("""
+                INSERT INTO chat_history (username, id_domain, role, message)
+                VALUES (%s, %s, %s, %s)
+            """, (req.username, id_domain, 'user', req.question))
+            conn.commit()
+
         # Kirim ke Ollama (misalnya: localhost:11434/api/generate)
         response = requests.post(OLLAMA_URL, json=payload, timeout=60)
         if response.status_code != 200:
@@ -45,8 +61,26 @@ def chat(req: ChatRequest):
 
         result = response.json()
         reply_text = result.get("response", "").strip()
+        
+        if not reply_text:
+            reply_text = "Model tidak memberikan respons."
 
-        return {"reply": reply_text or "Model tidak memberikan respons."}
+        # Simpan respons AI ke database
+        if id_domain:
+            cur.execute("""
+                INSERT INTO chat_history (username, id_domain, role, message)
+                VALUES (%s, %s, %s, %s)
+            """, (req.username, id_domain, 'assistant', reply_text))
+            conn.commit()
+        
+        cur.close()
+
+        return {"reply": reply_text}
 
     except Exception as e:
+        if conn:
+            conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
