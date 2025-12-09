@@ -56,7 +56,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     """
     # Fetch user from database
     query = text("""
-        SELECT id, username, password_hash, full_name, email, phone, role, created_at, last_login, dark_mode, compact_mode
+        SELECT id, username, password_hash, full_name, email, phone, role, created_at, last_login, dark_mode, compact_mode, generator_keywords
         FROM users
         WHERE username = :username
     """)
@@ -109,6 +109,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         "last_login": user_dict["last_login"].isoformat() if user_dict["last_login"] else None,
         "dark_mode": user_dict.get("dark_mode", False),
         "compact_mode": user_dict.get("compact_mode", False),
+        "generator_keywords": user_dict.get("generator_keywords", ""),
     }
     
     return {
@@ -184,6 +185,7 @@ async def refresh_token(current_user: dict = Depends(get_current_user)):
 class PreferencesUpdate(BaseModel):
     dark_mode: Optional[bool] = None
     compact_mode: Optional[bool] = None
+    generator_keywords: Optional[str] = None
 
 
 @router.post("/preferences")
@@ -218,6 +220,10 @@ async def update_preferences(
             update_parts.append("compact_mode = :compact_mode")
             params["compact_mode"] = preferences.compact_mode
         
+        if preferences.generator_keywords is not None:
+            update_parts.append("generator_keywords = :generator_keywords")
+            params["generator_keywords"] = preferences.generator_keywords
+        
         if not update_parts:
             raise HTTPException(status_code=400, detail="No preferences to update")
         
@@ -225,7 +231,7 @@ async def update_preferences(
             UPDATE users
             SET {", ".join(update_parts)}
             WHERE username = :username
-            RETURNING dark_mode, compact_mode
+            RETURNING dark_mode, compact_mode, generator_keywords
         """)
         
         result = db.execute(update_query, params)
@@ -240,7 +246,8 @@ async def update_preferences(
         return {
             "ok": True,
             "dark_mode": row_dict["dark_mode"],
-            "compact_mode": row_dict["compact_mode"]
+            "compact_mode": row_dict["compact_mode"],
+            "generator_keywords": row_dict["generator_keywords"]
         }
     
     except HTTPException:

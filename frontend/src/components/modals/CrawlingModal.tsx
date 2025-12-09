@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/Dialog"
 import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
+import { useAuth } from "@/contexts/AuthContext"
+import { apiPost } from "@/lib/api"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || ""
 
@@ -28,14 +30,28 @@ export default function CrawlingModal({
     onClose: () => void
     onComplete?: () => void
 }) {
+    const { user } = useAuth()
     const [activeTab, setActiveTab] = useState<Tab>("detail")
     const [domainCount, setDomainCount] = useState(15)
-    const [keywords, setKeywords] = useState("judi online, slot gacor, casino online, poker online, togel online, situs judi, agen bola, bandar togel, slot deposit, judi bola")
+    const [keywords, setKeywords] = useState("")
     const [isEditingKeywords, setIsEditingKeywords] = useState(false)
     const [tempKeywords, setTempKeywords] = useState(keywords)
     const [generatingKeywords, setGeneratingKeywords] = useState(false)
     const [showKeywordInput, setShowKeywordInput] = useState(false)
     const [baseKeyword, setBaseKeyword] = useState("")
+
+    // Load keywords from user preferences on mount
+    useEffect(() => {
+        if (user?.generator_keywords) {
+            setKeywords(user.generator_keywords)
+            setTempKeywords(user.generator_keywords)
+        } else {
+            // Default keywords if user has no saved preferences
+            const defaultKeywords = "judi online, slot gacor, casino online, poker online, togel online, situs judi, agen bola, bandar togel, slot deposit, judi bola"
+            setKeywords(defaultKeywords)
+            setTempKeywords(defaultKeywords)
+        }
+    }, [user])
 
     // Generating tab state
     const [logs, setLogs] = useState<string[]>([])
@@ -131,9 +147,26 @@ export default function CrawlingModal({
         setTempKeywords(keywords)
     }
 
-    function handleSaveKeywords() {
+    async function handleSaveKeywords() {
         setKeywords(tempKeywords)
         setIsEditingKeywords(false)
+
+        // Save to user preferences in database
+        try {
+            await apiPost("/api/auth/preferences", {
+                generator_keywords: tempKeywords
+            })
+
+            // Update localStorage to persist the change
+            const storedUser = localStorage.getItem("auth_user")
+            if (storedUser) {
+                const userData = JSON.parse(storedUser)
+                userData.generator_keywords = tempKeywords
+                localStorage.setItem("auth_user", JSON.stringify(userData))
+            }
+        } catch (err) {
+            console.error("Failed to save keywords to preferences:", err)
+        }
     }
 
     function handleOpenKeywordGenerator() {
@@ -180,6 +213,23 @@ export default function CrawlingModal({
             const generatedKeywords = data.keywords.join(", ")
             setKeywords(generatedKeywords)
             setTempKeywords(generatedKeywords)
+
+            // Save to user preferences in database
+            try {
+                await apiPost("/api/auth/preferences", {
+                    generator_keywords: generatedKeywords
+                })
+
+                // Update localStorage to persist the change
+                const storedUser = localStorage.getItem("auth_user")
+                if (storedUser) {
+                    const userData = JSON.parse(storedUser)
+                    userData.generator_keywords = generatedKeywords
+                    localStorage.setItem("auth_user", JSON.stringify(userData))
+                }
+            } catch (err) {
+                console.error("Failed to save keywords to preferences:", err)
+            }
 
             // Close input and reset
             setShowKeywordInput(false)

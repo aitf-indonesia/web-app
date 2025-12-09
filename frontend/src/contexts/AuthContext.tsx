@@ -15,6 +15,7 @@ interface User {
     last_login?: string;
     dark_mode?: boolean;
     compact_mode?: boolean;
+    generator_keywords?: string;
 }
 
 interface AuthContextType {
