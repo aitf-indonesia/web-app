@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import UserManagementSection from "@/components/admin/UserManagementSection"
 import GeneratorSettingsSection from "@/components/admin/GeneratorSettingsSection"
 import DomainManagementSection from "@/components/admin/DomainManagementSection"
+import FeedbackSection from "@/components/admin/FeedbackSection"
 import { Button } from "@/components/ui/Button"
 import { useRouter } from "next/navigation"
 
@@ -14,9 +15,9 @@ export default function AdminPage() {
 
     return (
         <ProtectedAdminRoute>
-            <div className="min-h-screen bg-background">
+            <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #00336A 0%, #003D7D 50%, #003F81 100%)' }}>
                 {/* Header */}
-                <header className="border-b bg-card">
+                <header className="border-b bg-card/95 backdrop-blur-sm">
                     <div className="container mx-auto px-4 py-4 flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold">Admin Panel</h1>
@@ -38,6 +39,9 @@ export default function AdminPage() {
                 {/* Main Content */}
                 <main className="container mx-auto px-4 py-8">
                     <div className="space-y-8">
+                        {/* Feedback */}
+                        <FeedbackSection />
+
                         {/* User Management */}
                         <UserManagementSection />
 

@@ -5,9 +5,9 @@ import { cn } from "@/lib/utils"
 import { LinkRecord } from "@/types/linkRecord"
 
 const STATUS_LABEL = {
-  verified: { label: "Verified", className: "bg-secondary text-foreground" },
+  verified: { label: "Verified", className: "bg-blue-500/10 text-blue-600 dark:text-blue-400" }, // Changed to blue
   unverified: { label: "Unverified", className: "bg-primary/10 text-primary" },
-  "false-positive": { label: "False Positive", className: "bg-destructive/10 text-destructive-foreground" },
+  "false-positive": { label: "False", className: "bg-destructive/10 text-destructive-foreground" },
 }
 
 // Fallback untuk status yang tidak terdefinisi
@@ -42,23 +42,79 @@ export default function DataTable({
   isLoading,
   error,
   setDetail,
+  sortCol,
+  sortOrder,
+  onSort,
+  compactMode = false,
 }: {
   pageItems: LinkRecord[]
   isLoading: boolean
   error: any
   setDetail: (item: LinkRecord) => void
+  sortCol?: "tanggal" | "kepercayaan" | "lastModified" | "modifiedBy"
+  sortOrder?: "asc" | "desc"
+  onSort?: (col: "tanggal" | "kepercayaan" | "lastModified" | "modifiedBy") => void
+  compactMode?: boolean
 }) {
+  const SortIcon = ({ column }: { column: "tanggal" | "kepercayaan" | "lastModified" | "modifiedBy" }) => {
+    if (sortCol !== column) {
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="inline-block mr-1 opacity-40">
+          <path d="M7 10l5-5 5 5M7 14l5 5 5-5" />
+        </svg>
+      )
+    }
+
+    if (sortOrder === "asc") {
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="inline-block mr-1">
+          <path d="M7 14l5-5 5 5" />
+        </svg>
+      )
+    }
+
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="inline-block mr-1">
+        <path d="M7 10l5 5 5-5" />
+      </svg>
+    )
+  }
+
   return (
-    <table className="w-full text-sm">
+    <table className={cn("w-full", compactMode ? "text-xs" : "text-sm")}>
       <thead className="bg-muted text-foreground/80">
         <tr>
-          <th className="px-4 py-3 text-left font-medium w-[28%]">Link</th>
-          <th className="px-4 py-3 text-left font-medium">Tanggal</th>
-          <th className="px-4 py-3 text-left font-medium">Tgl Berubah</th>
-          <th className="px-4 py-3 text-left font-medium">Modified By</th>
-          <th className="px-4 py-3 text-left font-medium">Kepercayaan</th>
-          <th className="px-4 py-3 text-left font-medium">Status</th>
-          <th className="px-4 py-3 text-left font-medium" />
+          <th className={cn("px-4 text-left font-medium w-[31%]", compactMode ? "py-2" : "py-3")}>Link</th>
+          <th
+            className={cn("px-4 text-left font-medium w-[12%]", compactMode ? "py-2" : "py-3", onSort ? 'cursor-pointer hover:bg-muted-foreground/10 select-none' : '')}
+            onClick={() => onSort?.("tanggal")}
+          >
+            {onSort && <SortIcon column="tanggal" />}
+            Tanggal
+          </th>
+          <th
+            className={cn("px-4 text-left font-medium w-[12%]", compactMode ? "py-2" : "py-3", onSort ? 'cursor-pointer hover:bg-muted-foreground/10 select-none' : '')}
+            onClick={() => onSort?.("lastModified")}
+          >
+            {onSort && <SortIcon column="lastModified" />}
+            Tgl Berubah
+          </th>
+          <th
+            className={cn("px-4 text-left font-medium w-[10%]", compactMode ? "py-2" : "py-3", onSort ? 'cursor-pointer hover:bg-muted-foreground/10 select-none' : '')}
+            onClick={() => onSort?.("modifiedBy")}
+          >
+            {onSort && <SortIcon column="modifiedBy" />}
+            Diubah Oleh
+          </th>
+          <th
+            className={cn("px-4 text-left font-medium w-[18%]", compactMode ? "py-2" : "py-3", onSort ? 'cursor-pointer hover:bg-muted-foreground/10 select-none' : '')}
+            onClick={() => onSort?.("kepercayaan")}
+          >
+            {onSort && <SortIcon column="kepercayaan" />}
+            Kepercayaan
+          </th>
+          <th className={cn("px-4 text-left font-medium w-[10%]", compactMode ? "py-2" : "py-3")}>Status</th>
+          <th className={cn("px-4 text-left font-medium w-[7%]", compactMode ? "py-2" : "py-3")} />
         </tr>
       </thead>
       <tbody>
@@ -81,52 +137,67 @@ export default function DataTable({
         )}
         {pageItems.map((it) => {
           const conf = it.kepercayaan
+          const cellPadding = compactMode ? "py-1.5" : "py-3"
           return (
             <tr key={it.id} className="border-t border-border hover:bg-muted/40">
-              <td className="px-4 py-3 font-medium">
-                <div className="flex items-center gap-1.5">
-                  {it.isNew && (
-                    <Badge className="bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] px-1.5 py-0 font-semibold">
-                      Baru
-                    </Badge>
-                  )}
-                  <div className="text-xs text-foreground/50">{toHexId(it.id)}</div>
-                  {it.flagged && (
-                    <span title="Flagged">
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        className="text-primary"
-                      >
-                        <path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z" />
-                      </svg>
-                    </span>
-                  )}
-                </div>
-                <div className="truncate max-w-[28ch]" title={it.link}>{it.link}</div>
-              </td>
-              <td className="px-4 py-3">{formatDateOnly(it.tanggal)}</td>
-              <td className="px-4 py-3">{formatDateOnly(it.lastModified)}</td>
-              <td className="px-4 py-3 text-foreground/70">{it.modifiedBy}</td>
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-10 text-right">{conf}%</span>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div
-                      className={cn("h-2 rounded-full", confidenceBarColor(conf))}
-                      style={{ width: `${conf}%` }}
-                    />
+              <td className={cn("px-4 font-medium w-[31%] max-w-0", cellPadding)}>
+                <div className="flex flex-col gap-0.5 overflow-hidden">
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {it.isNew && (
+                      <Badge className="bg-blue-900/20 text-blue-900 dark:text-blue-300 text-[10px] px-1.5 py-0 font-semibold">
+                        Baru
+                      </Badge>
+                    )}
+                    <div className="text-xs text-foreground/50">{toHexId(it.id)}</div>
+                    {it.flagged && (
+                      <span title="Flagged">
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                          className="text-primary"
+                        >
+                          <path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z" />
+                        </svg>
+                      </span>
+                    )}
                   </div>
+                  <div className="truncate overflow-hidden text-ellipsis whitespace-nowrap" title={it.link}>{it.link}</div>
                 </div>
               </td>
-              <td className="px-4 py-3">
-                <Badge className={cn("font-semibold", getStatusLabel(it.status).className)}>
-                  {getStatusLabel(it.status).label}
-                </Badge>
+              <td className={cn("px-4 w-[12%]", cellPadding)}>{formatDateOnly(it.tanggal)}</td>
+              <td className={cn("px-4 w-[12%]", cellPadding)}>{formatDateOnly(it.lastModified)}</td>
+              <td className={cn("px-4 text-foreground/70 w-[10%]", cellPadding)}>{it.modifiedBy}</td>
+              <td className={cn("px-4 w-[18%]", cellPadding)}>
+                {it.isManual ? (
+                  <div className="flex items-center gap-2">
+                    <span className="w-10 text-right text-foreground/50">-</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="w-10 text-right">{conf}%</span>
+                    <div className={cn("w-full bg-muted rounded-full", compactMode ? "h-1.5" : "h-2")}>
+                      <div
+                        className={cn("rounded-full", compactMode ? "h-1.5" : "h-2", confidenceBarColor(conf))}
+                        style={{ width: `${conf}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </td>
-              <td className="px-4 py-3">
+              <td className={cn("px-4 w-[10%]", cellPadding)}>
+                {it.isManual ? (
+                  <Badge className="bg-secondary text-foreground font-semibold">
+                    Manual
+                  </Badge>
+                ) : (
+                  <Badge className={cn("font-semibold", getStatusLabel(it.status).className)}>
+                    {getStatusLabel(it.status).label}
+                  </Badge>
+                )}
+              </td>
+              <td className={cn("px-4 w-[7%]", cellPadding)}>
                 <button
                   className="text-primary hover:underline font-medium"
                   onClick={() => setDetail(it)}

@@ -22,14 +22,16 @@ import {
   Sun,
   Settings,
 } from "lucide-react"
+import FeedbackModal from "@/components/modals/FeedbackModal"
 
-export default function Sidebar({ activeTab, setActiveTab, tabs, onLogout }: any) {
+export default function Sidebar({ activeTab, setActiveTab, tabs, onLogout, compactMode, setCompactMode }: any) {
   const router = useRouter()
   const { user } = useAuth()
   const [openProfileMenu, setOpenProfileMenu] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isDark, setDark] = useState(false)
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
 
   // 🔹 Sync dark mode dari localStorage
   useEffect(() => {
@@ -38,7 +40,14 @@ export default function Sidebar({ activeTab, setActiveTab, tabs, onLogout }: any
     setDark(dark)
   }, [])
 
-  const toggleDarkMode = () => {
+  // 🔹 Sync compact mode dari localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("compactMode")
+    const compact = saved === "true"
+    setCompactMode?.(compact)
+  }, [setCompactMode])
+
+  const toggleDarkMode = async () => {
     const next = !isDark
     setDark(next)
     if (next) {
@@ -47,6 +56,44 @@ export default function Sidebar({ activeTab, setActiveTab, tabs, onLogout }: any
     } else {
       document.documentElement.classList.remove("dark")
       localStorage.setItem("theme", "light")
+    }
+
+    // Save to backend
+    try {
+      const { apiPost } = await import("@/lib/api")
+      await apiPost("/api/auth/preferences", { dark_mode: next })
+
+      // Update user data in localStorage
+      const storedUser = localStorage.getItem("auth_user")
+      if (storedUser) {
+        const userData = JSON.parse(storedUser)
+        userData.dark_mode = next
+        localStorage.setItem("auth_user", JSON.stringify(userData))
+      }
+    } catch (err) {
+      console.error("Failed to save dark mode preference:", err)
+    }
+  }
+
+  const toggleCompactMode = async () => {
+    const next = !compactMode
+    setCompactMode?.(next)
+    localStorage.setItem("compactMode", next.toString())
+
+    // Save to backend
+    try {
+      const { apiPost } = await import("@/lib/api")
+      await apiPost("/api/auth/preferences", { compact_mode: next })
+
+      // Update user data in localStorage
+      const storedUser = localStorage.getItem("auth_user")
+      if (storedUser) {
+        const userData = JSON.parse(storedUser)
+        userData.compact_mode = next
+        localStorage.setItem("auth_user", JSON.stringify(userData))
+      }
+    } catch (err) {
+      console.error("Failed to save compact mode preference:", err)
     }
   }
 
@@ -89,9 +136,21 @@ export default function Sidebar({ activeTab, setActiveTab, tabs, onLogout }: any
     </svg>
   )
 
+  const ManualIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" className="h-4 w-4" fill="currentColor">
+      <path d="M136 192C136 125.7 189.7 72 256 72C322.3 72 376 125.7 376 192C376 258.3 322.3 312 256 312C189.7 312 136 258.3 136 192zM48 546.3C48 447.8 127.8 368 226.3 368L285.7 368C384.2 368 464 447.8 464 546.3C464 562.7 450.7 576 434.3 576L77.7 576C61.3 576 48 562.7 48 546.3zM544 160C557.3 160 568 170.7 568 184L568 232L616 232C629.3 232 640 242.7 640 256C640 269.3 629.3 280 616 280L568 280L568 328C568 341.3 557.3 352 544 352C530.7 352 520 341.3 520 328L520 280L472 280C458.7 280 448 269.3 448 256C448 242.7 458.7 232 472 232L520 232L520 184C520 170.7 530.7 160 544 160z" />
+    </svg>
+  )
+
   const AdminIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" className="h-4 w-4" fill="currentColor">
       <path d="M415.9 274.5C428.1 271.2 440.9 277 446.4 288.3L465 325.9C475.3 327.3 485.4 330.1 494.9 334L529.9 310.7C540.4 303.7 554.3 305.1 563.2 314L582.4 333.2C591.3 342.1 592.7 356.1 585.7 366.5L562.4 401.4C564.3 406.1 566 411 567.4 416.1C568.8 421.2 569.7 426.2 570.4 431.3L608.1 449.9C619.4 455.5 625.2 468.3 621.9 480.4L614.9 506.6C611.6 518.7 600.3 526.9 587.7 526.1L545.7 523.4C539.4 531.5 532.1 539 523.8 545.4L526.5 587.3C527.3 599.9 519.1 611.3 507 614.5L480.8 621.5C468.6 624.8 455.9 619 450.3 607.7L431.7 570.1C421.4 568.7 411.3 565.9 401.8 562L366.8 585.3C356.3 592.3 342.4 590.9 333.5 582L314.3 562.8C305.4 553.9 304 540 311 529.5L334.3 494.5C332.4 489.8 330.7 484.9 329.3 479.8C327.9 474.7 327 469.6 326.3 464.6L288.6 446C277.3 440.4 271.6 427.6 274.8 415.5L281.8 389.3C285.1 377.2 296.4 369 309 369.8L350.9 372.5C357.2 364.4 364.5 356.9 372.8 350.5L370.1 308.7C369.3 296.1 377.5 284.7 389.6 281.5L415.8 274.5zM448.4 404C424.1 404 404.4 423.7 404.5 448.1C404.5 472.4 424.2 492 448.5 492C472.8 492 492.5 472.3 492.5 448C492.4 423.6 472.7 404 448.4 404zM224.9 18.5L251.1 25.5C263.2 28.8 271.4 40.2 270.6 52.7L267.9 94.5C276.2 100.9 283.5 108.3 289.8 116.5L331.8 113.8C344.3 113 355.7 121.2 359 133.3L366 159.5C369.2 171.6 363.5 184.4 352.2 190L314.5 208.6C313.8 213.7 312.8 218.8 311.5 223.8C310.2 228.8 308.4 233.8 306.5 238.5L329.8 273.5C336.8 284 335.4 297.9 326.5 306.8L307.3 326C298.4 334.9 284.5 336.3 274 329.3L239 306C229.5 309.9 219.4 312.7 209.1 314.1L190.5 351.7C184.9 363 172.1 368.7 160 365.5L133.8 358.5C121.6 355.2 113.5 343.8 114.3 331.3L117 289.4C108.7 283 101.4 275.6 95.1 267.4L53.1 270.1C40.6 270.9 29.2 262.7 25.9 250.6L18.9 224.4C15.7 212.3 21.4 199.5 32.7 193.9L70.4 175.3C71.1 170.2 72.1 165.2 73.4 160.1C74.8 155 76.4 150.1 78.4 145.4L55.1 110.5C48.1 100 49.5 86.1 58.4 77.2L77.6 58C86.5 49.1 100.4 47.7 110.9 54.7L145.9 78C155.4 74.1 165.5 71.3 175.8 69.9L194.4 32.3C200 21 212.7 15.3 224.9 18.5zM192.4 148C168.1 148 148.4 167.7 148.4 192C148.4 216.3 168.1 236 192.4 236C216.7 236 236.4 216.3 236.4 192C236.4 167.7 216.7 148 192.4 148z" />
+    </svg>
+  )
+
+  const MailIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" className="h-4 w-4" fill="currentColor">
+      <path d="M112 128C85.5 128 64 149.5 64 176C64 191.1 71.1 205.3 83.2 214.4L291.2 370.4C308.3 383.2 331.7 383.2 348.8 370.4L556.8 214.4C568.9 205.3 576 191.1 576 176C576 149.5 554.5 128 528 128L112 128zM64 260L64 448C64 483.3 92.7 512 128 512L512 512C547.3 512 576 483.3 576 448L576 260L377.6 408.8C343.5 434.4 296.5 434.4 262.4 408.8L64 260z" />
     </svg>
   )
 
@@ -101,6 +160,7 @@ export default function Sidebar({ activeTab, setActiveTab, tabs, onLogout }: any
     unverified: UnverifiedIcon,
     "false-positive": FalsePositiveIcon,
     flagged: FlaggedIcon,
+    manual: ManualIcon,
     summary: SummaryIcon,
   }
 
@@ -258,28 +318,64 @@ export default function Sidebar({ activeTab, setActiveTab, tabs, onLogout }: any
           )}
         </nav>
 
-        {/* Footer: Dark Mode Toggle */}
+        {/* Footer: Feedback + Mode Toggles */}
         <div
           className={cn(
             "mt-auto p-2 flex flex-col gap-2 transition-all duration-300",
             isCollapsed && "items-center"
           )}
         >
+          {/* Feedback Button */}
           <Button
             variant="ghost"
             size={isCollapsed ? "icon" : "sm"}
-            onClick={toggleDarkMode}
-            title="Toggle Dark Mode"
+            onClick={() => setIsFeedbackOpen(true)}
+            title="Kirim Feedback"
+            className="text-white hover:bg-white/10"
           >
-            {isDark ? (
-              <Sun className="h-5 w-5 text-yellow-400" />
-            ) : (
-              <Moon className="h-5 w-5 text-blue-500" />
-            )}
+            <MailIcon />
             {!isCollapsed && (
-              <span className="ml-2 text-white">{isDark ? "Light Mode" : "Dark Mode"}</span>
+              <span className="ml-2">Kirim Feedback</span>
             )}
           </Button>
+
+          {/* Dark Mode & Compact Mode Toggles */}
+          <div className={cn(
+            "flex gap-2",
+            isCollapsed ? "flex-col" : "flex-row"
+          )}>
+            {/* Compact Mode Toggle */}
+            <Button
+              variant="ghost"
+              size={isCollapsed ? "icon" : "sm"}
+              onClick={toggleCompactMode}
+              title="Compact"
+              className="text-white hover:bg-white/10 flex-1"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" className="h-5 w-5" fill="currentColor">
+                <path d="M128 128C92.7 128 64 156.7 64 192L64 448C64 483.3 92.7 512 128 512L512 512C547.3 512 576 483.3 576 448L576 192C576 156.7 547.3 128 512 128L128 128zM224 384C224 401.7 209.7 416 192 416C174.3 416 160 401.7 160 384C160 366.3 174.3 352 192 352C209.7 352 224 366.3 224 384zM192 288C174.3 288 160 273.7 160 256C160 238.3 174.3 224 192 224C209.7 224 224 238.3 224 256C224 273.7 209.7 288 192 288zM312 232L456 232C469.3 232 480 242.7 480 256C480 269.3 469.3 280 456 280L312 280C298.7 280 288 269.3 288 256C288 242.7 298.7 232 312 232zM312 360L456 360C469.3 360 480 370.7 480 384C480 397.3 469.3 408 456 408L312 408C298.7 408 288 397.3 288 384C288 370.7 298.7 360 312 360z" />
+              </svg>
+              {!isCollapsed && (
+                <span className="ml-2">{compactMode ? "Normal" : "Compact"}</span>
+              )}
+            </Button>
+
+            {/* Dark Mode Toggle */}
+            <Button
+              variant="ghost"
+              size={isCollapsed ? "icon" : "sm"}
+              onClick={toggleDarkMode}
+              title="Dark/Light"
+              className="text-white hover:bg-white/10 flex-1"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" className="h-5 w-5" fill="currentColor">
+                <path d="M512 320C512 214 426 128 320 128L320 512C426 512 512 426 512 320zM64 320C64 178.6 178.6 64 320 64C461.4 64 576 178.6 576 320C576 461.4 461.4 576 320 576C178.6 576 64 461.4 64 320z" />
+              </svg>
+              {!isCollapsed && (
+                <span className="ml-2">{isDark ? "Light" : "Dark"}</span>
+              )}
+            </Button>
+          </div>
         </div>
       </aside>
 
@@ -290,6 +386,12 @@ export default function Sidebar({ activeTab, setActiveTab, tabs, onLogout }: any
           onClick={() => setIsMobileOpen(false)}
         />
       )}
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+      />
     </>
   )
 }

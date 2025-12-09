@@ -1,7 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 from pydantic import BaseModel
 import requests
 import os
+from db import get_db
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
@@ -11,12 +14,14 @@ MODEL_NAME = os.getenv("MODEL_NAME", "mistral")
 class ChatRequest(BaseModel):
     question: str
     item: dict
+    username: str
 
 
 @router.post("/chat")
-def chat(req: ChatRequest):
+def chat(req: ChatRequest, db: Session = Depends(get_db)):
     """
     Endpoint untuk melakukan percakapan dengan model Mistral melalui Ollama.
+    Menyimpan pesan user dan respons AI ke database.
     """
     try:
         # Bangun konteks dari data item
@@ -38,6 +43,21 @@ def chat(req: ChatRequest):
             "stream": False,
         }
 
+        # Simpan pesan user ke database
+        id_domain = req.item.get('id')
+        if id_domain:
+            insert_query = text("""
+                INSERT INTO chat_history (username, id_domain, role, message)
+                VALUES (:username, :id_domain, :role, :message)
+            """)
+            db.execute(insert_query, {
+                "username": req.username,
+                "id_domain": id_domain,
+                "role": "user",
+                "message": req.question
+            })
+            db.commit()
+
         # Kirim ke Ollama (misalnya: localhost:11434/api/generate)
         response = requests.post(OLLAMA_URL, json=payload, timeout=60)
         if response.status_code != 200:
@@ -45,8 +65,26 @@ def chat(req: ChatRequest):
 
         result = response.json()
         reply_text = result.get("response", "").strip()
+        
+        if not reply_text:
+            reply_text = "Model tidak memberikan respons."
 
-        return {"reply": reply_text or "Model tidak memberikan respons."}
+        # Simpan respons AI ke database
+        if id_domain:
+            insert_query = text("""
+                INSERT INTO chat_history (username, id_domain, role, message)
+                VALUES (:username, :id_domain, :role, :message)
+            """)
+            db.execute(insert_query, {
+                "username": req.username,
+                "id_domain": id_domain,
+                "role": "assistant",
+                "message": reply_text
+            })
+            db.commit()
+
+        return {"reply": reply_text}
 
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
