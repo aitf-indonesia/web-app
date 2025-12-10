@@ -93,7 +93,10 @@ def generate_keywords(keyword: str, api_key: str) -> List[str]:
             "engine": "google_trends",
             "q": keyword,
             "data_type": "RELATED_QUERIES",
-            "api_key": api_key
+            "api_key": api_key,
+            'hl': 'id',
+            'geo': 'ID',
+            'date': 'today 1-m'
         }
         
         response = requests.get(url, params=params, timeout=60)
