@@ -56,7 +56,7 @@ export default function PRDDashboardPage() {
   const [addingManual, setAddingManual] = useState(false)
   const [compactMode, setCompactMode] = useState(false)
 
-  const { data, error, isLoading, mutate } = useSWR<LinkRecord[]>("/api/data/", fetcher, {
+  const { data, error, isLoading, mutate } = useSWR<LinkRecord[]>("/api/data?v=2", fetcher, {
     refreshInterval: 4000,
     revalidateOnFocus: true,
   })

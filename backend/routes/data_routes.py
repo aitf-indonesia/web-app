@@ -7,6 +7,7 @@ from datetime import datetime
 
 router = APIRouter(prefix="/api/data", tags=["Data"])
 
+@router.get("")
 @router.get("/")
 def get_all_data(
     db: Session = Depends(get_db),
