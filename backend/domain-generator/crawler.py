@@ -61,6 +61,8 @@ MAX_WORKERS_DETECTION = 3  # Limit concurrent API calls to detection service
 
 # Detection API configuration
 DETECTION_API_URL = "http://localhost:9090/predict"
+REASONING_API_URL = "http://localhost:7001/predict-url"
+REASONING_API_TIMEOUT = 120  # Slightly higher than API's internal 30s timeout
 MAX_RESULT = 10  # Maximum number of valid domains to process per run
 VERSION = "1.4"
 
@@ -436,51 +438,128 @@ def send_to_detection_api(screenshot_path, item_id):
         return None
 
 
-def process_detection_api_parallel(all_results):
-    """Process detection API calls in parallel for successful screenshots."""
+def send_to_reasoning_api(url, item_id):
+    """Send URL to reasoning API and return response."""
+    try:
+        # Extract clean domain from URL
+        domain = extract_domain(url)
+        if domain == "unknown":
+            # Try to use the URL as-is if domain extraction fails
+            domain = url.replace('https://', '').replace('http://', '').split('/')[0]
+        
+        payload = {
+            "url": domain,
+            "timeout": 30000
+        }
+        
+        response = requests.post(
+            REASONING_API_URL,
+            json=payload,
+            timeout=REASONING_API_TIMEOUT
+        )
+        
+        if response.status_code == 200:
+            api_response = response.json()
+            if api_response.get('status') == 'success':
+                label = api_response.get('label', 'non_judi')
+                confidence = api_response.get('confidence', 0.0)
+                print(f"[REASONING API] {item_id}: ✓ {label} (confidence: {confidence:.4f})")
+                return api_response
+            else:
+                print(f"[REASONING API] {item_id}: API returned status={api_response.get('status')}")
+                return None
+        else:
+            print(f"[REASONING API] {item_id}: HTTP {response.status_code}")
+            return None
+            
+    except requests.exceptions.Timeout:
+        print(f"[REASONING API] {item_id}: Timeout after {REASONING_API_TIMEOUT}s")
+        return None
+    except requests.exceptions.ConnectionError:
+        print(f"[REASONING API] {item_id}: Connection failed (is API running on port 7001?)")
+        return None
+    except Exception as e:
+        print(f"[REASONING API] {item_id}: Error - {str(e)[:100]}")
+        return None
+
+
+def process_apis_parallel(all_results):
+    """Process both detection and reasoning API calls in parallel for successful screenshots."""
     # Filter only successful screenshots
-    detection_tasks = []
+    api_tasks = []
     for result in all_results:
         if result.get('screenshot_status') == 'success':
             item_id = result.get('id', 'unknown')
             screenshot_path = os.path.join(OUTPUT_IMG_DIR, f"{item_id}.png")
-            detection_tasks.append((screenshot_path, item_id, result))
+            url = result.get('url', '')
+            api_tasks.append((screenshot_path, url, item_id, result))
     
-    if not detection_tasks:
-        print("[DETECTION API] No successful screenshots to process")
+    if not api_tasks:
+        print("[API] No successful screenshots to process")
         return
     
-    print(f"\n[DETECTION API] Sending {len(detection_tasks)} screenshots to API with {MAX_WORKERS_DETECTION} workers")
+    print(f"\n[API] Sending {len(api_tasks)} items to both Detection and Reasoning APIs with {MAX_WORKERS_DETECTION} workers")
     
     # Use ThreadPoolExecutor for API calls
     with ThreadPoolExecutor(max_workers=MAX_WORKERS_DETECTION) as executor:
-        futures = {
-            executor.submit(send_to_detection_api, path, item_id): (item_id, result)
-            for path, item_id, result in detection_tasks
-        }
+        # Submit both detection and reasoning API calls for each item
+        futures = {}
         
+        for screenshot_path, url, item_id, result in api_tasks:
+            # Submit detection API call
+            detection_future = executor.submit(send_to_detection_api, screenshot_path, item_id)
+            futures[detection_future] = ('detection', item_id, result)
+            
+            # Submit reasoning API call
+            reasoning_future = executor.submit(send_to_reasoning_api, url, item_id)
+            futures[reasoning_future] = ('reasoning', item_id, result)
+        
+        # Collect results as they complete
         completed = 0
+        total_calls = len(futures)
+        
         for future in as_completed(futures):
-            item_id, result = futures[future]
+            api_type, item_id, result = futures[future]
             try:
                 api_response = future.result()
-                if api_response:
-                    result['detection_api_response'] = api_response
-                    result['detection_status'] = 'success'
-                else:
-                    result['detection_status'] = 'failed'
-                completed += 1
-                status_symbol = "✓" if api_response else "✗"
-                print(f"[{completed}/{len(detection_tasks)}] {item_id} {status_symbol}")
+                
+                if api_type == 'detection':
+                    if api_response:
+                        result['detection_api_response'] = api_response
+                        result['detection_status'] = 'success'
+                    else:
+                        result['detection_status'] = 'failed'
+                    completed += 1
+                    status_symbol = "✓" if api_response else "✗"
+                    print(f"[{completed}/{total_calls}] Detection {item_id} {status_symbol}")
+                    
+                elif api_type == 'reasoning':
+                    if api_response:
+                        result['reasoning_api_response'] = api_response
+                        result['reasoning_status'] = 'success'
+                    else:
+                        result['reasoning_status'] = 'failed'
+                    completed += 1
+                    status_symbol = "✓" if api_response else "✗"
+                    print(f"[{completed}/{total_calls}] Reasoning {item_id} {status_symbol}")
+                    
             except Exception as e:
-                result['detection_status'] = 'failed'
+                if api_type == 'detection':
+                    result['detection_status'] = 'failed'
+                elif api_type == 'reasoning':
+                    result['reasoning_status'] = 'failed'
                 completed += 1
-                print(f"[{completed}/{len(detection_tasks)}] {item_id} ✗ (Exception: {str(e)[:50]})")
+                print(f"[{completed}/{total_calls}] {api_type.title()} {item_id} ✗ (Exception: {str(e)[:50]})")
     
     # Print summary
-    success_count = sum(1 for r in all_results if r.get('detection_status') == 'success')
-    failed_count = sum(1 for r in all_results if r.get('detection_status') == 'failed')
-    print(f"[DETECTION API] Complete: {success_count} success, {failed_count} failed")
+    detection_success = sum(1 for r in all_results if r.get('detection_status') == 'success')
+    detection_failed = sum(1 for r in all_results if r.get('detection_status') == 'failed')
+    reasoning_success = sum(1 for r in all_results if r.get('reasoning_status') == 'success')
+    reasoning_failed = sum(1 for r in all_results if r.get('reasoning_status') == 'failed')
+    
+    print(f"[DETECTION API] Complete: {detection_success} success, {detection_failed} failed")
+    print(f"[REASONING API] Complete: {reasoning_success} success, {reasoning_failed} failed")
+
 
 
 def save_to_database(all_results, keyword, username='system'):
@@ -607,13 +686,80 @@ def save_to_database(all_results, keyword, username='system'):
                         detection_saved_count += 1
                         print(f"[DATABASE] Inserted into object_detection", flush=True)
                     
+                    # Prepare reasoning data if available
+                    id_reasoning = None
+                    reasoning_text = None
+                    
+                    # If reasoning API was successful, save to reasoning table
+                    if result.get('reasoning_status') == 'success' and result.get('reasoning_api_response'):
+                        reasoning_response = result['reasoning_api_response']
+                        
+                        # Extract data from reasoning API response
+                        reasoning_label_str = reasoning_response.get('label', 'non_judi')
+                        reasoning_label = True if reasoning_label_str == 'judi' else False
+                        reasoning_text = reasoning_response.get('reasoning', '')
+                        reasoning_confidence = reasoning_response.get('confidence', 0.0)
+                        reasoning_confidence_score = round(reasoning_confidence * 100, 1)  # Convert to percentage (0-100)
+                        
+                        metadata = reasoning_response.get('metadata', {})
+                        model_source = metadata.get('model_source', 'unknown')
+                        
+                        # If reasoning API succeeded but detection didn't, use reasoning for final values
+                        if not label_final:
+                            label_final = reasoning_label
+                            final_confidence = reasoning_confidence_score
+                        
+                        # Insert into reasoning table
+                        try:
+                            conn.execute(text("""
+                                INSERT INTO reasoning (
+                                    id_domain,
+                                    label,
+                                    context,
+                                    confidence_score,
+                                    model_version
+                                ) VALUES (
+                                    :id_domain,
+                                    :label,
+                                    :context,
+                                    :confidence_score,
+                                    :model_version
+                                )
+                                ON CONFLICT (id_domain) DO UPDATE SET
+                                    label = EXCLUDED.label,
+                                    context = EXCLUDED.context,
+                                    confidence_score = EXCLUDED.confidence_score,
+                                    model_version = EXCLUDED.model_version,
+                                    processed_at = now()
+                                RETURNING id_reasoning
+                            """), {
+                                "id_domain": id_domain,
+                                "label": reasoning_label,
+                                "context": reasoning_text,
+                                "confidence_score": reasoning_confidence_score,
+                                "model_version": model_source
+                            })
+                            
+                            # Get the id_reasoning
+                            reasoning_result = conn.execute(text(
+                                "SELECT id_reasoning FROM reasoning WHERE id_domain = :id_domain"
+                            ), {"id_domain": id_domain}).fetchone()
+                            
+                            if reasoning_result:
+                                id_reasoning = reasoning_result[0]
+                                print(f"[DATABASE] Inserted into reasoning with id_reasoning={id_reasoning}", flush=True)
+                        except Exception as reasoning_error:
+                            print(f"[DATABASE] Failed to insert reasoning: {str(reasoning_error)}", flush=True)
+                    
                     # Insert or update results table with created_by tracking
                     # properties for results
                     results_params = {
                         "id_domain": id_domain,
+                        "id_reasoning": id_reasoning,
                         "id_detection": id_detection,
                         "url": result.get('url', ''),
                         "keywords": keyword,
+                        "reasoning_text": reasoning_text,
                         "image_final_path": image_detected_path or image_path,
                         "label_final": label_final,
                         "final_confidence": final_confidence,
@@ -630,9 +776,11 @@ def save_to_database(all_results, keyword, username='system'):
                             print(f"[DATABASE] Updating existing result for id_domain={id_domain}", flush=True)
                             conn.execute(text("""
                                 UPDATE results SET
+                                    id_reasoning = :id_reasoning,
                                     id_detection = :id_detection,
                                     url = :url,
                                     keywords = :keywords,
+                                    reasoning_text = :reasoning_text,
                                     image_final_path = :image_final_path,
                                     label_final = :label_final,
                                     final_confidence = :final_confidence,
@@ -648,9 +796,11 @@ def save_to_database(all_results, keyword, username='system'):
                             conn.execute(text("""
                                 INSERT INTO results (
                                     id_domain,
+                                    id_reasoning,
                                     id_detection,
                                     url,
                                     keywords,
+                                    reasoning_text,
                                     image_final_path,
                                     label_final,
                                     final_confidence,
@@ -661,9 +811,11 @@ def save_to_database(all_results, keyword, username='system'):
                                     modified_at
                                 ) VALUES (
                                     :id_domain,
+                                    :id_reasoning,
                                     :id_detection,
                                     :url,
                                     :keywords,
+                                    :reasoning_text,
                                     :image_final_path,
                                     :label_final,
                                     :final_confidence,
@@ -909,9 +1061,9 @@ def main():
     print(f"[SCREENSHOT] Starting screenshot capture for {len(all_results)} URLs...", flush=True)
     process_screenshots_parallel(all_results)
     
-    # Process detection API calls for successful screenshots
-    print(f"[DETECTION API] Starting object detection for successful screenshots...", flush=True)
-    process_detection_api_parallel(all_results)
+    # Process both detection and reasoning API calls for successful screenshots
+    print(f"[API] Starting parallel API calls (Detection + Reasoning) for successful screenshots...", flush=True)
+    process_apis_parallel(all_results)
     
     # Generate timestamp
     now = datetime.utcnow()
@@ -962,6 +1114,10 @@ def main():
     detection_success = sum(1 for r in all_results if r.get("detection_status") == "success")
     detection_failed = sum(1 for r in all_results if r.get("detection_status") == "failed")
     
+    # Count reasoning API results
+    reasoning_success = sum(1 for r in all_results if r.get("reasoning_status") == "success")
+    reasoning_failed = sum(1 for r in all_results if r.get("reasoning_status") == "failed")
+    
     # Calculate elapsed time
     elapsed_time = int(time.time() - start_time)
     elapsed_minutes = elapsed_time // 60
@@ -986,6 +1142,11 @@ def main():
         "detection_api": {
             "success": detection_success,
             "failed": detection_failed,
+            "total": screenshot_success
+        },
+        "reasoning_api": {
+            "success": reasoning_success,
+            "failed": reasoning_failed,
             "total": screenshot_success
         },
         "domains_inserted": len(all_results) if db_success else 0,
