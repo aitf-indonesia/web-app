@@ -2,9 +2,9 @@
  * API utilities for making authenticated requests
  */
 
-// Use relative URLs for API calls - Nginx will proxy /api/* to backend
-// For local dev with separate ports, set NEXT_PUBLIC_API_URL in .env.local
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+// Force relative URLs for API calls to ensure Next.js proxying works correctly
+// This avoids mixed content errors (HTTP vs HTTPS) and localhost access issues
+const API_URL = "";
 
 /**
  * Get authentication token from localStorage

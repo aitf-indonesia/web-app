@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-import subprocess
 import os
 import uuid
 import asyncio
@@ -11,12 +10,15 @@ from utils.auth_middleware import get_current_user
 
 router = APIRouter()
 
-# Store active crawler processes
-active_processes: Dict[str, subprocess.Popen] = {}
+# Store active crawler processes (async)
+active_processes: Dict[str, asyncio.subprocess.Process] = {}
 
 class CrawlerRequest(BaseModel):
     domain_count: int
     keywords: list[str]
+
+class ManualCrawlerRequest(BaseModel):
+    domains: list[str]
 
 class CrawlerStatus(BaseModel):
     job_id: str
@@ -47,22 +49,21 @@ async def start_crawler(request: CrawlerRequest, current_user: dict = Depends(ge
         username = current_user.get("username", "unknown")
         
         # Use bash wrapper to activate conda environment before running crawler
-        cmd = [
-            "bash",
-            "-c",
+        cmd = (
             f"source /home/ubuntu/miniconda3/etc/profile.d/conda.sh && "
             f"conda activate prd6 && "
             f"cd {os.path.dirname(crawler_path)} && "
-            f"python3 crawler.py -n {request.domain_count} -k '{keywords_str}' -u '{username}'"
-        ]
+            f"python3 -u crawler.py -n {request.domain_count} -k '{keywords_str}' -u '{username}'"
+        )
         
-        # Start crawler process
-        process = subprocess.Popen(
+        # Start crawler process asynchronously with bash and unbuffered output
+        process = await asyncio.create_subprocess_exec(
+            "/bin/bash",
+            "-c",
             cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,  # Line buffered
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            env={**os.environ, "PYTHONUNBUFFERED": "1"}
         )
         
         # Store process
@@ -77,6 +78,57 @@ async def start_crawler(request: CrawlerRequest, current_user: dict = Depends(ge
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start crawler: {str(e)}")
 
+@router.post("/manual")
+async def start_manual_crawler(request: ManualCrawlerRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Start the crawler with a manual list of domains.
+    Requires authentication.
+    """
+    try:
+        if not request.domains or len(request.domains) == 0:
+            raise HTTPException(status_code=400, detail="Domains list cannot be empty")
+        
+        # Generate unique job ID
+        job_id = str(uuid.uuid4())
+        
+        # Path to crawler script
+        crawler_path = os.path.join(os.path.dirname(__file__), "..", "domain-generator", "crawler.py")
+        
+        # Prepare domains string (comma separate)
+        domains_str = ','.join(request.domains)
+        username = current_user.get("username", "unknown")
+        
+        # Use bash wrapper to activate conda environment before running crawler
+        # Pass domains via -d argument
+        cmd = (
+            f"source /home/ubuntu/miniconda3/etc/profile.d/conda.sh && "
+            f"conda activate prd6 && "
+            f"cd {os.path.dirname(crawler_path)} && "
+            f"python3 -u crawler.py -d '{domains_str}' -u '{username}'"
+        )
+        
+        # Start crawler process asynchronously
+        process = await asyncio.create_subprocess_exec(
+            "/bin/bash",
+            "-c",
+            cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            env={**os.environ, "PYTHONUNBUFFERED": "1"}
+        )
+        
+        # Store process
+        active_processes[job_id] = process
+        
+        return {
+            "job_id": job_id,
+            "status": "started",
+            "message": f"Manual crawler started with {len(request.domains)} domains"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to start manual crawler: {str(e)}")
+
 @router.get("/logs/{job_id}")
 async def stream_logs(job_id: str):
     """
@@ -89,17 +141,35 @@ async def stream_logs(job_id: str):
     
     async def event_generator():
         try:
-            # Stream stdout line by line
-            for line in iter(process.stdout.readline, ''):
+            # Send initial keepalive
+            yield f": keepalive\n\n"
+            
+            # Stream stdout line by line using async readline
+            while True:
+                # Use asyncio.wait_for to add timeout and prevent hanging
+                try:
+                    line = await asyncio.wait_for(process.stdout.readline(), timeout=0.1)
+                except asyncio.TimeoutError:
+                    # Send keepalive comment to prevent connection timeout
+                    yield f": keepalive\n\n"
+                    
+                    # Check if process has finished
+                    if process.returncode is not None:
+                        break
+                    continue
+                
                 if not line:
+                    # EOF reached
                     break
                 
-                # Send line as SSE event
-                yield f"data: {line.strip()}\n\n"
-                await asyncio.sleep(0)  # Allow other tasks to run
+                # Decode and send line as SSE event immediately
+                decoded_line = line.decode('utf-8').strip()
+                if decoded_line:
+                    # Yield immediately - don't batch
+                    yield f"data: {decoded_line}\n\n"
             
             # Wait for process to complete
-            process.wait()
+            await process.wait()
             
             # Send completion event
             yield f"data: [DONE]\n\n"
@@ -139,11 +209,11 @@ async def cancel_crawler(job_id: str):
         
         # Wait up to 5 seconds for graceful shutdown
         try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
+            await asyncio.wait_for(process.wait(), timeout=5.0)
+        except asyncio.TimeoutError:
             # Force kill if still running
             process.kill()
-            process.wait()
+            await process.wait()
         
         # Clean up
         del active_processes[job_id]
@@ -172,7 +242,7 @@ async def get_crawler_status(job_id: str):
     process = active_processes[job_id]
     
     # Check if process is still running
-    if process.poll() is None:
+    if process.returncode is None:
         return {
             "job_id": job_id,
             "status": "running",

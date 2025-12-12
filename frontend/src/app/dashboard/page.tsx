@@ -14,11 +14,9 @@ import ThemeToggle from "@/components/layout/ThemeToggle"
 import { PerPage } from "@/components/controls/PerPage"
 
 // charts & modal
-import JenisChart from "@/components/charts/JenisChart"
-import TpFpChart from "@/components/charts/TpFpChart"
-import ConfidenceChart from "@/components/charts/ConfidenceChart"
 import DetailModal from "@/components/modals/DetailModal"
 import CrawlingModal from "@/components/modals/CrawlingModal"
+import SummaryDashboard from "./SummaryDashboard"
 import { StaticParticlesBackground } from "@/components/ui/StaticParticlesBackground"
 
 import { LinkRecord } from "@/types/linkRecord"
@@ -31,19 +29,19 @@ const fetcher = async (url: string) => {
 }
 
 const TAB_ORDER = [
+  { key: "summary", label: "Home" },
   { key: "all", label: "All" },
   { key: "verified", label: "Verified" },
   { key: "unverified", label: "Unverified" },
   { key: "false-positive", label: "False Positive" },
   { key: "flagged", label: "Flagged" },
   { key: "manual", label: "Manual" },
-  { key: "summary", label: "Summary" },
 ] as const
 type TabKey = (typeof TAB_ORDER)[number]["key"]
 
 export default function PRDDashboardPage() {
   const { logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<TabKey>("all")
+  const [activeTab, setActiveTab] = useState<TabKey>("summary")
   const [search, setSearch] = useState("")
   const [sortCol, setSortCol] = useState<"tanggal" | "kepercayaan" | "lastModified" | "modifiedBy">("tanggal")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
@@ -56,7 +54,7 @@ export default function PRDDashboardPage() {
   const [addingManual, setAddingManual] = useState(false)
   const [compactMode, setCompactMode] = useState(false)
 
-  const { data, error, isLoading, mutate } = useSWR<LinkRecord[]>("/api/data/", fetcher, {
+  const { data, error, isLoading, mutate } = useSWR<LinkRecord[]>("/api/data?v=2", fetcher, {
     refreshInterval: 4000,
     revalidateOnFocus: true,
   })
@@ -302,11 +300,10 @@ export default function PRDDashboardPage() {
           )}
 
           {activeTab === "summary" && (
-            <div className="p-4 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              <JenisChart data={data ?? []} />
-              <TpFpChart data={data ?? []} />
-              <ConfidenceChart data={data ?? []} />
-            </div>
+            <SummaryDashboard
+              data={Array.isArray(data) ? data : []}
+              onGoToAll={() => setActiveTab("all")}
+            />
           )}
         </main>
 

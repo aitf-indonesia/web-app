@@ -125,7 +125,9 @@ export default function DataTable({
         )}
         {error && (
           <tr>
-            <td colSpan={7} className="px-4 py-6 text-center text-destructive">Failed to load data</td>
+            <td colSpan={7} className="px-4 py-6 text-center text-destructive">
+              Failed to load data: {error?.message || JSON.stringify(error)}
+            </td>
           </tr>
         )}
         {!isLoading && !error && pageItems.length === 0 && (
