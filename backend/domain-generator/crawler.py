@@ -615,7 +615,7 @@ def save_to_database(all_results, keyword, username='system'):
                         "url": result.get('url', ''),
                         "keywords": keyword,
                         "image_final_path": image_detected_path or image_path,
-                        "label_final": label,
+                        "label_final": label_final,
                         "final_confidence": final_confidence,
                         "created_by": username,
                         "modified_by": username
@@ -625,69 +625,80 @@ def save_to_database(all_results, keyword, username='system'):
                     existing_result = conn.execute(text("SELECT 1 FROM results WHERE id_domain = :id_domain"), {"id_domain": id_domain}).fetchone()
                     
                     try:
-                        with conn.begin_nested():
-                            if existing_result:
-                                # UPDATE
-                                conn.execute(text("""
-                                    UPDATE results SET
-                                        id_detection = :id_detection,
-                                        url = :url,
-                                        keywords = :keywords,
-                                        image_final_path = :image_final_path,
-                                        label_final = :label_final,
-                                        final_confidence = :final_confidence,
-                                        modified_by = :modified_by,
-                                        modified_at = now()
-                                    WHERE id_domain = :id_domain
-                                """), results_params)
-                                print(f"[DATABASE] Updated existing result for id_domain={id_domain}", flush=True)
-                            else:
-                                # INSERT
-                                conn.execute(text("""
-                                    INSERT INTO results (
-                                        id_domain,
-                                        id_detection,
-                                        url,
-                                        keywords,
-                                        image_final_path,
-                                        label_final,
-                                        final_confidence,
-                                        status,
-                                        created_by,
-                                        created_at,
-                                        modified_by,
-                                        modified_at
-                                    ) VALUES (
-                                        :id_domain,
-                                        :id_detection,
-                                        :url,
-                                        :keywords,
-                                        :image_final_path,
-                                        :label_final,
-                                        :final_confidence,
-                                        'unverified',
-                                        :created_by,
-                                        now(),
-                                        :modified_by,
-                                        now()
-                                    )
-                                """), results_params)
-                                print(f"[DATABASE] Inserted into results", flush=True)
-                            
-                            results_saved_count += 1
+                        if existing_result:
+                            # UPDATE
+                            print(f"[DATABASE] Updating existing result for id_domain={id_domain}", flush=True)
+                            conn.execute(text("""
+                                UPDATE results SET
+                                    id_detection = :id_detection,
+                                    url = :url,
+                                    keywords = :keywords,
+                                    image_final_path = :image_final_path,
+                                    label_final = :label_final,
+                                    final_confidence = :final_confidence,
+                                    modified_by = :modified_by,
+                                    modified_at = now()
+                                WHERE id_domain = :id_domain
+                            """), results_params)
+                            print(f"[DATABASE] Updated existing result for id_domain={id_domain}", flush=True)
+                        else:
+                            # INSERT
+                            print(f"[DATABASE] Inserting new result for id_domain={id_domain}", flush=True)
+                            print(f"[DATABASE] Params: label_final={results_params.get('label_final')}, confidence={results_params.get('final_confidence')}", flush=True)
+                            conn.execute(text("""
+                                INSERT INTO results (
+                                    id_domain,
+                                    id_detection,
+                                    url,
+                                    keywords,
+                                    image_final_path,
+                                    label_final,
+                                    final_confidence,
+                                    status,
+                                    created_by,
+                                    created_at,
+                                    modified_by,
+                                    modified_at
+                                ) VALUES (
+                                    :id_domain,
+                                    :id_detection,
+                                    :url,
+                                    :keywords,
+                                    :image_final_path,
+                                    :label_final,
+                                    :final_confidence,
+                                    'unverified',
+                                    :created_by,
+                                    now(),
+                                    :modified_by,
+                                    now()
+                                )
+                            """), results_params)
+                            print(f"[DATABASE] Inserted into results", flush=True)
+                        
+                        results_saved_count += 1
                     except Exception as e:
-                         print(f"[WARN] Failed to update/insert results table: {e}", flush=True)
+                        print(f"[ERROR] Failed to update/insert results table: {str(e)}", flush=True)
+                        import traceback
+                        print(f"[ERROR] Traceback: {traceback.format_exc()}", flush=True)
+                        raise  # Re-raise to be caught by outer exception handler
                     
-                    # Add audit log entry for domain creation
-                    conn.execute(text("""
-                        INSERT INTO audit_log (id_result, action, username, timestamp)
-                        SELECT id_results, 'created', :username, now()
-                        FROM results
-                        WHERE id_domain = :id_domain
-                    """), {
-                        "username": username,
-                        "id_domain": id_domain
-                    })
+                    # Add audit log entry for domain creation (optional, don't fail if it errors)
+                    try:
+                        conn.execute(text("""
+                            INSERT INTO audit_log (id_result, action, username, timestamp)
+                            SELECT id_results, 'created', :username, now()
+                            FROM results
+                            WHERE id_domain = :id_domain
+                            LIMIT 1
+                        """), {
+                            "username": username,
+                            "id_domain": id_domain
+                        })
+                        print(f"[DATABASE] Audit log created for id_domain={id_domain}", flush=True)
+                    except Exception as audit_error:
+                        print(f"[WARN] Failed to create audit log (non-critical): {str(audit_error)[:100]}", flush=True)
+                    
                     print(f"[DATABASE] Record {idx+1}/{len(all_results)} saved successfully", flush=True)
                     
                 except Exception as record_error:

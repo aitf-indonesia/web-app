@@ -6,5 +6,5 @@ source /home/ubuntu/miniconda3/etc/profile.d/conda.sh
 conda activate prd6
 
 # Run uvicorn
-cd /home/ubuntu/tim6_prd_workdir/backend
+cd /home/ubuntu/tim6_prd_workdir_2/prototype-dashboard-chatbot/backend
 exec uvicorn main:app --host 0.0.0.0 --port 8000

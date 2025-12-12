@@ -17,7 +17,7 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # Project directory
-PROJECT_DIR="/home/ubuntu/tim6_prd_workdir"
+PROJECT_DIR="/home/ubuntu/tim6_prd_workdir_2/prototype-dashboard-chatbot"
 FRONTEND_DIR="$PROJECT_DIR/frontend"
 BACKEND_DIR="$PROJECT_DIR/backend"
 

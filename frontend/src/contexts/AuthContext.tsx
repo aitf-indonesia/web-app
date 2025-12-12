@@ -65,12 +65,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 body: JSON.stringify({ username, password }),
             });
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || "Login failed");
+            // Try to parse response as JSON
+            let data;
+            const contentType = response.headers.get("content-type");
+
+            if (contentType && contentType.includes("application/json")) {
+                data = await response.json();
+            } else {
+                // If response is not JSON, get text and throw error
+                const text = await response.text();
+                console.error("Non-JSON response:", text);
+                throw new Error(`Server error: ${text.substring(0, 100)}`);
             }
 
-            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || "Login failed");
+            }
 
             // Store token and user info
             localStorage.setItem("auth_token", data.access_token);

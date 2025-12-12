@@ -4,7 +4,7 @@ module.exports = {
             name: 'prd-analyst-frontend',
             script: 'npm',
             args: 'start',
-            cwd: '/home/ubuntu/tim6_prd_workdir/frontend',
+            cwd: '/home/ubuntu/tim6_prd_workdir_2/prototype-dashboard-chatbot/frontend',
             instances: 1,
             exec_mode: 'fork',
             autorestart: true,
@@ -15,15 +15,15 @@ module.exports = {
                 PORT: 3000
                 // NEXT_PUBLIC_API_URL not set - uses relative URLs for Nginx proxying
             },
-            error_file: '/home/ubuntu/tim6_prd_workdir/logs/pm2-frontend-error.log',
-            out_file: '/home/ubuntu/tim6_prd_workdir/logs/pm2-frontend-out.log',
+            error_file: '/home/ubuntu/tim6_prd_workdir_2/prototype-dashboard-chatbot/logs/pm2-frontend-error.log',
+            out_file: '/home/ubuntu/tim6_prd_workdir_2/prototype-dashboard-chatbot/logs/pm2-frontend-out.log',
             log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
             merge_logs: true
         },
         {
             name: 'prd-analyst-backend',
-            script: '/home/ubuntu/tim6_prd_workdir/scripts/start-backend.sh',
-            cwd: '/home/ubuntu/tim6_prd_workdir/backend',
+            script: '/home/ubuntu/tim6_prd_workdir_2/prototype-dashboard-chatbot/scripts/start-backend.sh',
+            cwd: '/home/ubuntu/tim6_prd_workdir_2/prototype-dashboard-chatbot/backend',
             instances: 1,
             autorestart: true,
             watch: false,
@@ -31,8 +31,8 @@ module.exports = {
             env: {
                 PYTHONUNBUFFERED: '1'
             },
-            error_file: '/home/ubuntu/tim6_prd_workdir/logs/pm2-backend-error.log',
-            out_file: '/home/ubuntu/tim6_prd_workdir/logs/pm2-backend-out.log',
+            error_file: '/home/ubuntu/tim6_prd_workdir_2/prototype-dashboard-chatbot/logs/pm2-backend-error.log',
+            out_file: '/home/ubuntu/tim6_prd_workdir_2/prototype-dashboard-chatbot/logs/pm2-backend-out.log',
             log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
             merge_logs: true
         }

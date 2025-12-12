@@ -15,6 +15,7 @@ class ChatRequest(BaseModel):
     question: str
     item: dict
     username: str
+    mode: str = "edukasi"  # "hukum" or "edukasi"
 
 
 @router.post("/chat")
@@ -52,29 +53,54 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
             })
             db.commit()
 
-        # Coba kirim ke Ollama
-        reply_text = None
-        try:
-            payload = {
-                "model": MODEL_NAME,
-                "prompt": f"{context}\n\nPertanyaan pengguna: {req.question}",
-                "stream": False,
-            }
+        # Tentukan endpoint berdasarkan mode
+        target_url = "http://localhost:8002/v1/query/judol/edukasi"
+        category = "edukasi"
+        
+        if req.mode == "hukum":
+            target_url = "http://localhost:8002/v1/query/judol/hukum"
+            category = "hukum/umum"
+            
+        print(f"Chat mode: {req.mode}, routing to: {target_url}", flush=True)
 
-            # Kirim ke Ollama dengan timeout yang lebih pendek
-            response = requests.post(OLLAMA_URL, json=payload, timeout=30)
+        try:
+            # Construct payload for RAG service
+            rag_payload = {
+                "query": req.question,
+                "k": 7,
+                "category": category
+            }
+            
+            # Kirim request ke RAG Service
+            print(f"Sending request to RAG service: {rag_payload}", flush=True)
+            response = requests.post(target_url, json=rag_payload, timeout=60)
             
             if response.status_code == 200:
                 result = response.json()
-                reply_text = result.get("response", "").strip()
+                # Debug response structure
+                print(f"RAG Response keys: {result.keys()}", flush=True)
+                
+                # Try to get response from various possible keys
+                reply_text = result.get("response") or result.get("answer") or result.get("result")
+                
+                if not reply_text and "data" in result:
+                     reply_text = result["data"].get("response")
+                     
+                if not reply_text:
+                    reply_text = str(result) # Fallback to dumping the whole JSON
+                else:
+                    reply_text = str(reply_text).strip()
             else:
-                reply_text = f"⚠️ Ollama error (HTTP {response.status_code}). Silakan hubungi administrator untuk mengaktifkan layanan AI."
+                reply_text = f"⚠️ RAG Service error (HTTP {response.status_code})."
+                print(f"RAG Error: {response.text}", flush=True)
                 
         except requests.exceptions.ConnectionError:
-            reply_text = "⚠️ Layanan AI (Ollama) tidak tersedia. Silakan hubungi administrator untuk mengaktifkan layanan."
+            print("RAG Connection Error: Service not running on port 8002", flush=True)
+            reply_text = "⚠️ Layanan AI (RAG Service) tidak tersedia di port 8002. Pastikan service berjalan."
         except requests.exceptions.Timeout:
-            reply_text = "⚠️ Layanan AI timeout. Silakan coba lagi atau hubungi administrator."
+            reply_text = "⚠️ Layanan AI timeout (60s). Silakan coba lagi."
         except Exception as e:
+            print(f"RAG Exception: {str(e)}", flush=True)
             reply_text = f"⚠️ Error saat menghubungi AI: {str(e)}"
         
         if not reply_text:
