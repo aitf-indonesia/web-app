@@ -1,9 +1,23 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Force unbuffered output for real-time streaming
+import sys
+import os
+
+# Reconfigure stdout and stderr to be unbuffered
+if sys.stdout is not None:
+    sys.stdout.reconfigure(line_buffering=False, write_through=True)
+if sys.stderr is not None:
+    sys.stderr.reconfigure(line_buffering=False, write_through=True)
+
+# Set environment variable for unbuffered output (backup)
+os.environ['PYTHONUNBUFFERED'] = '1'
+
 from ddgs import DDGS
 import httpx
 from bs4 import BeautifulSoup
 import json
-import os
-import sys
 import argparse
 from datetime import datetime
 from urllib.parse import urlparse
@@ -472,168 +486,193 @@ def process_detection_api_parallel(all_results):
 def save_to_database(all_results, keyword, username='system'):
     """Save crawled results to database with user tracking."""
     print("[DATABASE] Starting database save...", flush=True)
+    print(f"[DATABASE] Attempting to save {len(all_results)} records", flush=True)
+    print(f"[DATABASE] Username: {username}", flush=True)
+    
+    if not all_results:
+        print("[DATABASE] WARNING: No results to save!", flush=True)
+        return False
     
     try:
         with engine.begin() as conn:
             saved_count = 0
             detection_saved_count = 0
             results_saved_count = 0
+            failed_count = 0
             
-            for result in all_results:
-                # Prepare image path in the format: domain-generator/output/img/<id>.png
-                # Note: result['id'] is just for file naming, not for database ID
-                screenshot_filename = result['id']
-                image_path = f"domain-generator/output/img/{screenshot_filename}.png" if result.get('screenshot_status') == 'success' else None
-                
-                # Insert into generated_domains table and let database auto-increment id_domain
-                insert_result = conn.execute(text("""
-                    INSERT INTO generated_domains (url, title, domain, image_path)
-                    VALUES (:url, :title, :domain, :image_path)
-                    RETURNING id_domain
-                """), {
-                    "url": result.get('url', ''),
-                    "title": result.get('title', '')[:255],  # Limit to 255 chars
-                    "domain": result.get('domain', ''),
-                    "image_path": image_path
-                })
-                
-                id_domain = insert_result.fetchone()[0]
-                saved_count += 1
-                
-                # Prepare detection data if available
-                id_detection = None
-                label_final = None
-                final_confidence = None
-                image_detected_path = None
-                
-                # If detection API was successful, save to object_detection table
-                if result.get('detection_status') == 'success' and result.get('detection_api_response'):
-                    api_response = result['detection_api_response']
-                    api_result = api_response.get('result', {})
+            for idx, result in enumerate(all_results):
+                try:
+                    print(f"[DATABASE] Processing record {idx+1}/{len(all_results)}: {result.get('domain', 'unknown')}", flush=True)
                     
-                    # Transform data
-                    status = api_result.get('status', '')
-                    label = True if status == 'gambling' else False
-                    label_final = label
+                    # Prepare image path in the format: domain-generator/output/img/<id>.png
+                    # Note: result['id'] is just for file naming, not for database ID
+                    screenshot_filename = result['id']
+                    image_path = f"domain-generator/output/img/{screenshot_filename}.png" if result.get('screenshot_status') == 'success' else None
                     
-                    # Use prob_fusion as the confidence score (this is what the API actually returns)
-                    confidence = api_result.get('prob_fusion', 0.0)
-                    confidence_score = round(confidence * 100, 1)  # Convert to percentage (0-100)
-                    final_confidence = confidence_score
-                    
-                    visualization_path = api_result.get('visualization_path', '')
-                    if visualization_path:
-                        visualization_path = visualization_path.lstrip('/')
-                        image_detected_path = f"~/tim5_prd_workdir/Gambling-Pipeline/{visualization_path}"
-                    
-                    id_detection = api_result.get('id')
-                    
-                    # Insert into object_detection table
-                    conn.execute(text("""
-                        INSERT INTO object_detection (
-                            id_detection,
-                            id_domain,
-                            label,
-                            confidence_score,
-                            image_detected_path,
-                            bounding_box,
-                            ocr,
-                            model_version
-                        ) VALUES (
-                            :id_detection,
-                            :id_domain,
-                            :label,
-                            :confidence_score,
-                            :image_detected_path,
-                            :bounding_box,
-                            :ocr,
-                            :model_version
-                        )
-                        ON CONFLICT (id_domain) DO UPDATE SET
-                            id_detection = EXCLUDED.id_detection,
-                            label = EXCLUDED.label,
-                            confidence_score = EXCLUDED.confidence_score,
-                            image_detected_path = EXCLUDED.image_detected_path,
-                            bounding_box = EXCLUDED.bounding_box,
-                            ocr = EXCLUDED.ocr,
-                            model_version = EXCLUDED.model_version,
-                            processed_at = now()
+                    # Insert into generated_domains table and let database auto-increment id_domain
+                    insert_result = conn.execute(text("""
+                        INSERT INTO generated_domains (url, title, domain, image_path)
+                        VALUES (:url, :title, :domain, :image_path)
+                        RETURNING id_domain
                     """), {
-                        "id_detection": id_detection,
-                        "id_domain": id_domain,
-                        "label": label,
-                        "confidence_score": confidence_score,
-                        "image_detected_path": image_detected_path,
-                        "bounding_box": json.dumps(api_result.get('detections', [])),
-                        "ocr": json.dumps(api_result.get('ocr', [])),
-                        "model_version": None
+                        "url": result.get('url', ''),
+                        "title": result.get('title', '')[:255],  # Limit to 255 chars
+                        "domain": result.get('domain', ''),
+                        "image_path": image_path
                     })
-                    detection_saved_count += 1
-                
-                # Insert into results table with created_by tracking
-                conn.execute(text("""
-                    INSERT INTO results (
-                        id_domain,
-                        id_detection,
-                        url,
-                        keywords,
-                        image_final_path,
-                        label_final,
-                        final_confidence,
-                        status,
-                        created_by,
-                        created_at,
-                        modified_by,
-                        modified_at
-                    ) VALUES (
-                        :id_domain,
-                        :id_detection,
-                        :url,
-                        :keywords,
-                        :image_final_path,
-                        :label_final,
-                        :final_confidence,
-                        'unverified',
-                        :created_by,
-                        now(),
-                        :modified_by,
-                        now()
-                    )
-                    ON CONFLICT (id_domain) DO NOTHING
-                """), {
-                    "id_domain": id_domain,
-                    "id_detection": id_detection,
-                    "url": result.get('url', ''),
-                    "keywords": keyword,
-                    "image_final_path": image_detected_path or image_path,
-                    "label_final": label_final,
-                    "final_confidence": final_confidence,
-                    "created_by": username,
-                    "modified_by": username
-                })
-                results_saved_count += 1
-                
-                # Add audit log entry for domain creation
-                conn.execute(text("""
-                    INSERT INTO audit_log (id_result, action, username, timestamp)
-                    SELECT id_results, 'created', :username, now()
-                    FROM results
-                    WHERE id_domain = :id_domain
-                """), {
-                    "username": username,
-                    "id_domain": id_domain
-                })
+                    
+                    id_domain = insert_result.fetchone()[0]
+                    saved_count += 1
+                    print(f"[DATABASE] Inserted into generated_domains with id_domain={id_domain}", flush=True)
+                    
+                    # Prepare detection data if available
+                    id_detection = None
+                    label_final = None
+                    final_confidence = None
+                    image_detected_path = None
+                    
+                    # If detection API was successful, save to object_detection table
+                    if result.get('detection_status') == 'success' and result.get('detection_api_response'):
+                        api_response = result['detection_api_response']
+                        api_result = api_response.get('result', {})
+                        
+                        # Transform data
+                        status = api_result.get('status', '')
+                        label = True if status == 'gambling' else False
+                        label_final = label
+                        
+                        # Use prob_fusion as the confidence score (this is what the API actually returns)
+                        confidence = api_result.get('prob_fusion', 0.0)
+                        confidence_score = round(confidence * 100, 1)  # Convert to percentage (0-100)
+                        final_confidence = confidence_score
+                        
+                        visualization_path = api_result.get('visualization_path', '')
+                        if visualization_path:
+                            visualization_path = visualization_path.lstrip('/')
+                            image_detected_path = f"~/tim5_prd_workdir/Gambling-Pipeline/{visualization_path}"
+                        
+                        id_detection = api_result.get('id')
+                        
+                        # Insert into object_detection table
+                        conn.execute(text("""
+                            INSERT INTO object_detection (
+                                id_detection,
+                                id_domain,
+                                label,
+                                confidence_score,
+                                image_detected_path,
+                                bounding_box,
+                                ocr,
+                                model_version
+                            ) VALUES (
+                                :id_detection,
+                                :id_domain,
+                                :label,
+                                :confidence_score,
+                                :image_detected_path,
+                                :bounding_box,
+                                :ocr,
+                                :model_version
+                            )
+                            ON CONFLICT (id_domain) DO UPDATE SET
+                                id_detection = EXCLUDED.id_detection,
+                                label = EXCLUDED.label,
+                                confidence_score = EXCLUDED.confidence_score,
+                                image_detected_path = EXCLUDED.image_detected_path,
+                                bounding_box = EXCLUDED.bounding_box,
+                                ocr = EXCLUDED.ocr,
+                                model_version = EXCLUDED.model_version,
+                                processed_at = now()
+                        """), {
+                            "id_detection": id_detection,
+                            "id_domain": id_domain,
+                            "label": label,
+                            "confidence_score": confidence_score,
+                            "image_detected_path": image_detected_path,
+                            "bounding_box": json.dumps(api_result.get('detections', [])),
+                            "ocr": json.dumps(api_result.get('ocr', [])),
+                            "model_version": None
+                        })
+                        detection_saved_count += 1
+                        print(f"[DATABASE] Inserted into object_detection", flush=True)
+                    
+                    # Insert into results table with created_by tracking
+                    conn.execute(text("""
+                        INSERT INTO results (
+                            id_domain,
+                            id_detection,
+                            url,
+                            keywords,
+                            image_final_path,
+                            label_final,
+                            final_confidence,
+                            status,
+                            created_by,
+                            created_at,
+                            modified_by,
+                            modified_at
+                        ) VALUES (
+                            :id_domain,
+                            :id_detection,
+                            :url,
+                            :keywords,
+                            :image_final_path,
+                            :label_final,
+                            :final_confidence,
+                            'unverified',
+                            :created_by,
+                            now(),
+                            :modified_by,
+                            now()
+                        )
+                        ON CONFLICT (id_domain) DO NOTHING
+                    """), {
+                        "id_domain": id_domain,
+                        "id_detection": id_detection,
+                        "url": result.get('url', ''),
+                        "keywords": keyword,
+                        "image_final_path": image_detected_path or image_path,
+                        "label_final": label_final,
+                        "final_confidence": final_confidence,
+                        "created_by": username,
+                        "modified_by": username
+                    })
+                    results_saved_count += 1
+                    print(f"[DATABASE] Inserted into results", flush=True)
+                    
+                    # Add audit log entry for domain creation
+                    conn.execute(text("""
+                        INSERT INTO audit_log (id_result, action, username, timestamp)
+                        SELECT id_results, 'created', :username, now()
+                        FROM results
+                        WHERE id_domain = :id_domain
+                    """), {
+                        "username": username,
+                        "id_domain": id_domain
+                    })
+                    print(f"[DATABASE] Record {idx+1}/{len(all_results)} saved successfully", flush=True)
+                    
+                except Exception as record_error:
+                    failed_count += 1
+                    print(f"[DATABASE] ERROR saving record {idx+1}: {str(record_error)}", flush=True)
+                    import traceback
+                    print(f"[DATABASE] Record error traceback: {traceback.format_exc()}", flush=True)
+                    # Continue with next record instead of failing completely
             
-            print(f"[DATABASE] Successfully saved {saved_count} domains to database", flush=True)
-            print(f"[DATABASE] Successfully saved {detection_saved_count} detection results to database", flush=True)
+            print(f"[DATABASE] ===== SAVE SUMMARY =====", flush=True)
+            print(f"[DATABASE] Successfully saved {saved_count} domains to generated_domains", flush=True)
+            print(f"[DATABASE] Successfully saved {detection_saved_count} detection results to object_detection", flush=True)
             print(f"[DATABASE] Successfully saved {results_saved_count} results with created_by={username}", flush=True)
-            return True
+            print(f"[DATABASE] Failed records: {failed_count}", flush=True)
+            print(f"[DATABASE] ===========================", flush=True)
+            return saved_count > 0  # Return True if at least one record was saved
             
     except Exception as e:
-        print(f"[DATABASE] ERROR: Failed to save to database - {str(e)}", flush=True)
+        print(f"[DATABASE] CRITICAL ERROR: Failed to save to database - {str(e)}", flush=True)
         import traceback
         print(f"[DATABASE] Traceback: {traceback.format_exc()}", flush=True)
         return False
+
 
 
 
