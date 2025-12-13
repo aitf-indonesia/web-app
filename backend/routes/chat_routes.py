@@ -29,10 +29,8 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
         context = f"""
         Berikut adalah informasi situs yang sedang dianalisis:
         - Link: {req.item.get('link')}
-        - Jenis: {req.item.get('jenis')}
         - Reasoning: {req.item.get('reasoning')}
         - Status: {req.item.get('status')}
-        - Tanggal: {req.item.get('tanggal')}
 
         Tugas kamu: bantu menjawab pertanyaan pengguna berdasarkan konteks di atas.
         Gunakan bahasa Indonesia yang baku dan profesional.

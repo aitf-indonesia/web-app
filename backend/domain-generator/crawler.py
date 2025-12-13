@@ -62,7 +62,7 @@ MAX_WORKERS_DETECTION = 3  # Limit concurrent API calls to detection service
 # Detection API configuration
 DETECTION_API_URL = "http://localhost:9090/predict"
 REASONING_API_URL = "http://localhost:7001/predict-url"
-REASONING_API_TIMEOUT = 120  # Slightly higher than API's internal 30s timeout
+REASONING_API_TIMEOUT = 300  # Slightly higher than API's internal 30s timeout
 MAX_RESULT = 10  # Maximum number of valid domains to process per run
 VERSION = "1.4"
 
