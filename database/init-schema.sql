@@ -206,7 +206,7 @@ CREATE TABLE public.generated_domains (
     url text,
     title character varying(255),
     domain character varying(255),
-    image_path text,
+    image_base64 text,
     date_generated timestamp with time zone DEFAULT now(),
     is_dummy boolean DEFAULT false
 );
@@ -318,7 +318,7 @@ CREATE TABLE public.object_detection (
     id_domain integer NOT NULL,
     label boolean,
     confidence_score numeric(4,1),
-    image_detected_path character varying(512),
+    image_detected_base64 text,
     bounding_box jsonb,
     ocr jsonb,
     model_version text,
@@ -465,6 +465,45 @@ ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
 
 
 --
+-- Name: announcements; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.announcements (
+    id integer NOT NULL,
+    title character varying(255) NOT NULL,
+    content text NOT NULL,
+    category character varying(50) DEFAULT 'info'::character varying,
+    created_by character varying(50) NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.announcements OWNER TO postgres;
+
+--
+-- Name: announcements_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.announcements_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.announcements_id_seq OWNER TO postgres;
+
+--
+-- Name: announcements_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.announcements_id_seq OWNED BY public.announcements.id;
+
+
+--
 -- Name: audit_log id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -532,6 +571,13 @@ ALTER TABLE ONLY public.results ALTER COLUMN id_results SET DEFAULT nextval('pub
 --
 
 ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_id_seq'::regclass);
+
+
+--
+-- Name: announcements id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.announcements ALTER COLUMN id SET DEFAULT nextval('public.announcements_id_seq'::regclass);
 
 
 --

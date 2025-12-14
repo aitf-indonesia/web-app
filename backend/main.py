@@ -8,7 +8,7 @@ import traceback
 import db
 from routes import data_routes
 from routes import chat_routes, chat_history_routes, history_routes, update_routes, text_analyze_routes, image_analyze_routes, law_rag_routes, crawler_routes
-from routes import auth_routes, audit_routes, admin_routes, notes_routes, image_routes, manual_domain_routes, feedback_routes, keyword_routes
+from routes import auth_routes, audit_routes, admin_routes, notes_routes, image_routes, manual_domain_routes, feedback_routes, keyword_routes, announcement_routes
 
 
 load_dotenv()
@@ -64,6 +64,7 @@ app.include_router(image_routes.router)
 app.include_router(manual_domain_routes.router)
 app.include_router(feedback_routes.router)
 app.include_router(keyword_routes.router)
+app.include_router(announcement_routes.router, prefix="/api", tags=["announcements"])
 
 @app.get("/")
 def root():

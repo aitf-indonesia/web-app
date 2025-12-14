@@ -38,10 +38,6 @@ backend/downloads/
 # backend/.env*
 # backend/.env.*.local
 
-# Domain generator output
-backend/domain-generator/output/*json
-backend/domain-generator/output/img/
-
 ### General ###
 # Misc
 # .env*
@@ -58,7 +54,6 @@ pnpm-debug.log*
 
 # Others
 archives
-prompt.txt
 db_information.txt
 .ipynb_checkpoints
 

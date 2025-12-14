@@ -55,7 +55,7 @@ export default function LoginPage() {
             background: 'white'
           }}
         >
-          <h1 className="text-2xl font-semibold text-center mb-4 text-gray-800">Masuk ke PRD Analyst</h1>
+          <h1 className="text-2xl font-semibold text-center mb-2 text-gray-800">Masuk ke PRD Analyst</h1>
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="text-sm font-medium text-gray-700">Username</label>
@@ -81,7 +81,6 @@ export default function LoginPage() {
                 style={{ backgroundColor: 'white', color: '#1f2937' }}
               />
             </div>
-            {error && <p className="text-sm text-red-600 text-center">{error}</p>}
             <Button
               type="submit"
               className="w-full text-white font-semibold"
@@ -92,12 +91,11 @@ export default function LoginPage() {
             >
               {loading ? "Memproses..." : "Login"}
             </Button>
+            <div className="text-center text-xs text-gray-600">
+              {error && <p className="text-sm text-red-600 text-center">{error}</p>}
+              <p>Jika lupa password, hubungi administrator</p>
+            </div>
           </form>
-          <div className="mt-4 text-center text-xs text-gray-600">
-            <p>Akun Testing:</p>
-            <p className="mt-1"><strong>admin</strong> / secret</p>
-            <p><strong>verif1</strong> / secret</p>
-          </div>
         </Card>
 
         <div className="w-full max-w-sm">

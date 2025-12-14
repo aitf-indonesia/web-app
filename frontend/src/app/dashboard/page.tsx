@@ -16,7 +16,7 @@ import { PerPage } from "@/components/controls/PerPage"
 // charts & modal
 import DetailModal from "@/components/modals/DetailModal"
 import CrawlingModal from "@/components/modals/CrawlingModal"
-import SummaryDashboard from "./SummaryDashboard"
+import HomeDashboard from "./HomeDashboard"
 import { StaticParticlesBackground } from "@/components/ui/StaticParticlesBackground"
 
 import { LinkRecord } from "@/types/linkRecord"
@@ -29,7 +29,7 @@ const fetcher = async (url: string) => {
 }
 
 const TAB_ORDER = [
-  { key: "summary", label: "Home" },
+  { key: "home", label: "Home" },
   { key: "all", label: "All" },
   { key: "verified", label: "Verified" },
   { key: "unverified", label: "Unverified" },
@@ -41,7 +41,7 @@ type TabKey = (typeof TAB_ORDER)[number]["key"]
 
 export default function PRDDashboardPage() {
   const { logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<TabKey>("summary")
+  const [activeTab, setActiveTab] = useState<TabKey>("home")
   const [search, setSearch] = useState("")
   const [sortCol, setSortCol] = useState<"tanggal" | "kepercayaan" | "lastModified" | "modifiedBy">("tanggal")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
@@ -172,7 +172,7 @@ export default function PRDDashboardPage() {
 
         {/* Main Content */}
         <main className="flex-1 bg-background overflow-y-auto">
-          {activeTab !== "summary" && (
+          {activeTab !== "home" && (
             <div className="flex flex-col h-full p-4 gap-4">
               {/* Control Panel */}
               <Card
@@ -299,8 +299,8 @@ export default function PRDDashboardPage() {
             </div>
           )}
 
-          {activeTab === "summary" && (
-            <SummaryDashboard
+          {activeTab === "home" && (
+            <HomeDashboard
               data={Array.isArray(data) ? data : []}
               onGoToAll={() => setActiveTab("all")}
             />

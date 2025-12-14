@@ -6,6 +6,7 @@ import UserManagementSection from "@/components/admin/UserManagementSection"
 import GeneratorSettingsSection from "@/components/admin/GeneratorSettingsSection"
 import DomainManagementSection from "@/components/admin/DomainManagementSection"
 import FeedbackSection from "@/components/admin/FeedbackSection"
+import AnnouncementManagementSection from "@/components/admin/AnnouncementManagementSection"
 import { Button } from "@/components/ui/Button"
 import { useRouter } from "next/navigation"
 
@@ -39,6 +40,9 @@ export default function AdminPage() {
                 {/* Main Content */}
                 <main className="container mx-auto px-4 py-8">
                     <div className="space-y-8">
+                        {/* Announcement Management */}
+                        <AnnouncementManagementSection />
+
                         {/* Feedback */}
                         <FeedbackSection />
 
