@@ -61,3 +61,11 @@ archives
 prompt.txt
 db_information.txt
 .ipynb_checkpoints
+
+### Docker ###
+# Docker volumes and data
+postgres_data/
+screenshots/
+
+# Docker environment (keep .env.docker as template)
+.env.docker.local

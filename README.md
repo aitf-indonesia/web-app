@@ -2,36 +2,53 @@
 
 Pengawasan Ruang Digital (PRD) Analyst is a monitoring system designed to detect, verify, and block online-gambling content across websites, social media, and public reports using AI-powered classification with human-in-the-loop validation.
 
-**Public URL**: https://nghbz6f39eg4xx-80.proxy.runpod.net/login
-
 ## Documentation
 
-**[Complete Guide](GUIDES.md)** - Comprehensive setup and deployment, troubleshooting, and command reference
+**[Docker Setup](DOCKER.md)** - Docker-based deployment guide with docker-compose
+
+**[Quick Start Guide](DOCKER-QUICKSTART.md)** - Quick reference for common Docker commands
+
+## Quick Start
+
+### Docker Deployment (Recommended)
+
+```bash
+# Start all services with Docker
+./docker-dev.sh start
+
+# Access at http://localhost
+```
+
+See [DOCKER.md](DOCKER.md) for complete Docker setup instructions.
+
+### Manual Deployment
+
+For VPS/RunPod deployment without Docker, see archived guides in `archives/vps-deployment/GUIDES.md`.
 
 ## Architecture
 
 ```
-Internet (HTTPS)
+Docker Container
     ↓
-RunPod Proxy: https://nghbz6f39eg4xx-80.proxy.runpod.net/login
-    ↓
-Container Port 80 → Nginx (Reverse Proxy)
+Nginx (Port 80) - Reverse Proxy
     ├─ /api/ → Backend (Port 8000) - FastAPI
     └─ /     → Frontend (Port 3000) - Next.js
+    ↓
+PostgreSQL (Port 5432) - Database
 ```
 
 ## Project Structure
 
 ```
-tim6_prd_workdir/
+prototype-dashboard-chatbot/
 ├── frontend/              # Next.js application
 ├── backend/               # FastAPI application
-├── scripts/               # Deployment & utility scripts
-├── guides/                # Documentation guides
-├── ecosystem.config.js    # PM2 configuration
-├── nginx.conf             # Nginx configuration
-├── setup.sh               # Setup script
-├── GUIDES.md              # Complete documentation
+├── database/              # Database initialization scripts
+├── archives/              # Archived legacy files
+├── docker-compose.yml     # Docker orchestration
+├── nginx.docker.conf      # Nginx configuration for Docker
+├── docker-dev.sh          # Docker helper script
+├── DOCKER.md              # Docker documentation
 └── README.md              # This file
 ```
 
