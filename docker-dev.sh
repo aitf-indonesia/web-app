@@ -29,7 +29,7 @@ print_info() {
 # Commands
 cmd_start() {
     print_info "Starting all services..."
-    docker-compose --env-file $ENV_FILE up -d
+    docker compose --env-file $ENV_FILE up -d
     print_success "All services started!"
     echo ""
     print_info "Access the application at: http://localhost"
@@ -40,63 +40,64 @@ cmd_start() {
 
 cmd_stop() {
     print_info "Stopping all services..."
-    docker-compose down
+    docker compose down
     print_success "All services stopped!"
 }
 
 cmd_restart() {
     print_info "Restarting all services..."
-    docker-compose restart
+    docker compose restart
     print_success "All services restarted!"
 }
 
 cmd_build() {
     print_info "Building all images..."
-    docker-compose build --no-cache
+    docker compose build --no-cache
     print_success "All images built!"
 }
 
 cmd_logs() {
     SERVICE=${1:-}
     if [ -z "$SERVICE" ]; then
-        docker-compose logs -f
+        docker compose logs -f
     else
-        docker-compose logs -f $SERVICE
+        docker compose logs -f $SERVICE
     fi
 }
 
 cmd_status() {
     print_info "Service Status:"
-    docker-compose ps
+    docker compose ps
 }
 
 cmd_shell() {
     SERVICE=${1:-backend}
     print_info "Opening shell in $SERVICE container..."
-    docker-compose exec $SERVICE /bin/sh
+    docker compose exec $SERVICE /bin/sh
 }
 
 cmd_db_backup() {
-    BACKUP_FILE="backup/prd_backup_$(date +%Y%m%d_%H%M%S).sql"
+    BACKUP_FILE="archives/backup/prd_backup_$(date +%Y%m%d_%H%M%S).sql"
     print_info "Backing up database to $BACKUP_FILE..."
-    docker-compose exec -T postgres pg_dump -U postgres prd > $BACKUP_FILE
+    mkdir -p archives/backup
+    docker compose exec -T postgres pg_dump -U postgres prd > $BACKUP_FILE
     print_success "Database backed up to $BACKUP_FILE"
 }
 
 cmd_db_restore() {
-    BACKUP_FILE=${1:-backup/prd_backup.sql}
+    BACKUP_FILE=${1:-archives/backup/prd_backup.sql}
     if [ ! -f "$BACKUP_FILE" ]; then
         print_error "Backup file not found: $BACKUP_FILE"
         exit 1
     fi
     print_info "Restoring database from $BACKUP_FILE..."
-    docker-compose exec -T postgres psql -U postgres prd < $BACKUP_FILE
+    docker compose exec -T postgres psql -U postgres prd < $BACKUP_FILE
     print_success "Database restored from $BACKUP_FILE"
 }
 
 cmd_clean() {
     print_info "Cleaning up containers, volumes, and images..."
-    docker-compose down -v
+    docker compose down -v
     print_success "Cleanup complete!"
 }
 
@@ -114,7 +115,7 @@ Commands:
     logs [service]  View logs (all services or specific service)
     status          Show service status
     shell [service] Open shell in container (default: backend)
-    db-backup       Backup database to backup/ directory
+    db-backup       Backup database to archives/backup/ directory
     db-restore [file] Restore database from backup file
     clean           Stop and remove all containers and volumes
     help            Show this help message
@@ -124,7 +125,7 @@ Examples:
     ./docker-dev.sh logs backend
     ./docker-dev.sh shell frontend
     ./docker-dev.sh db-backup
-    ./docker-dev.sh db-restore backup/prd_backup.sql
+    ./docker-dev.sh db-restore archives/backup/prd_backup.sql
 
 EOF
 }
