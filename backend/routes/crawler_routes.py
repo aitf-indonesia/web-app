@@ -103,15 +103,35 @@ async def run_runpod_crawler(
 
                 await job.log("[INFO] Connected to RunPod API, streaming logs...")
                 
+                # Track if we just saw a [SAVE] line
+                save_line_seen = False
+                
                 # Stream line by line
                 async for line in response.aiter_lines():
                     if not line:
                         continue
                     
+                    # Check if this is the [SAVE] Summary saved line
+                    if line.startswith("[SAVE] Summary saved:"):
+                        save_line_seen = True
+                        # Don't send the file path to UI
+                        continue
+                    
+                    # If previous line was [SAVE], this line should be the JSON
+                    if save_line_seen:
+                        save_line_seen = False
+                        try:
+                            job.summary = json.loads(line)
+                            # Send as [SUMMARY] format for frontend compatibility
+                            await job.log(f"[SUMMARY] {line}")
+                            continue
+                        except Exception as e:
+                            await job.error(f"Failed to parse summary JSON: {str(e)}")
+                    
                     # Send log to UI
                     await job.log(line)
                     
-                    # Check for SUMMARY in the log
+                    # Also check for old [SUMMARY] format for backward compatibility
                     if line.startswith("[SUMMARY]"):
                         try:
                             summary_json = line.replace("[SUMMARY]", "").strip()
@@ -119,9 +139,11 @@ async def run_runpod_crawler(
                         except Exception as e:
                             await job.error(f"Failed to parse summary JSON: {str(e)}")
 
-        # If no summary was found, create a basic one
-        if job.summary is None:
-            await job.log("[INFO] Crawler finished")
+        # If summary was found, ensure it's sent to frontend
+        if job.summary is not None:
+            await job.log(f"[SUMMARY] {json.dumps(job.summary)}")
+        else:
+            await job.log("[INFO] Crawler finished without summary")
         
     except httpx.TimeoutException:
         await job.error("RunPod API request timeout")
@@ -174,15 +196,35 @@ async def run_runpod_manual_crawler(
 
                 await job.log("[INFO] Connected to RunPod API, streaming logs...")
                 
+                # Track if we just saw a [SAVE] line
+                save_line_seen = False
+                
                 # Stream line by line
                 async for line in response.aiter_lines():
                     if not line:
                         continue
                     
+                    # Check if this is the [SAVE] Summary saved line
+                    if line.startswith("[SAVE] Summary saved:"):
+                        save_line_seen = True
+                        # Don't send the file path to UI
+                        continue
+                    
+                    # If previous line was [SAVE], this line should be the JSON
+                    if save_line_seen:
+                        save_line_seen = False
+                        try:
+                            job.summary = json.loads(line)
+                            # Send as [SUMMARY] format for frontend compatibility
+                            await job.log(f"[SUMMARY] {line}")
+                            continue
+                        except Exception as e:
+                            await job.error(f"Failed to parse summary JSON: {str(e)}")
+                    
                     # Send log to UI
                     await job.log(line)
                     
-                    # Check for SUMMARY in the log
+                    # Also check for old [SUMMARY] format for backward compatibility
                     if line.startswith("[SUMMARY]"):
                         try:
                             summary_json = line.replace("[SUMMARY]", "").strip()
@@ -190,9 +232,11 @@ async def run_runpod_manual_crawler(
                         except Exception as e:
                             await job.error(f"Failed to parse summary JSON: {str(e)}")
 
-        # If no summary was found, create a basic one
-        if job.summary is None:
-            await job.log("[INFO] Crawler finished")
+        # If summary was found, ensure it's sent to frontend
+        if job.summary is not None:
+            await job.log(f"[SUMMARY] {json.dumps(job.summary)}")
+        else:
+            await job.log("[INFO] Crawler finished without summary")
         
     except httpx.TimeoutException:
         await job.error("RunPod API request timeout")

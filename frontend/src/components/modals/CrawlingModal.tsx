@@ -802,11 +802,23 @@ export default function CrawlingModal({
                                     <div>
                                         <strong>Screenshot:</strong> {summary.screenshot.success}/{summary.screenshot.total} Success
                                     </div>
+
+                                    {/* New fields from updated summary format */}
+                                    {summary.detection_api && (
+                                        <div>
+                                            <strong>Detection API:</strong> {summary.detection_api.success}/{summary.detection_api.total} Success
+                                        </div>
+                                    )}
+                                    {summary.reasoning_api && (
+                                        <div>
+                                            <strong>Reasoning API:</strong> {summary.reasoning_api.success}/{summary.reasoning_api.total} Success
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
                             <div className="text-sm text-muted-foreground">
-                                {summary.domains_inserted} domain inserted
+                                {summary.domains_inserted} domain{summary.domains_inserted !== 1 ? 's' : ''} inserted
                             </div>
                         </div>
                     )}

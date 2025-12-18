@@ -224,6 +224,7 @@ export default function DetailModal({
   const [showNoteInput, setShowNoteInput] = useState(false)
   const [imageLoading, setImageLoading] = useState(true)
   const [zoomImage, setZoomImage] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -589,32 +590,45 @@ export default function DetailModal({
               variant="outline"
               size="icon"
               className="bg-white hover:bg-gray-100"
-              onClick={() => {
-                if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-                  navigator.clipboard.writeText(item.link)
-                    .then(() => console.log("Link copied:", item.link))
-                    .catch((err) => console.error("Clipboard error:", err));
-                } else {
-                  // fallback untuk browser lama
-                  const textarea = document.createElement("textarea");
-                  textarea.value = item.link;
-                  document.body.appendChild(textarea);
-                  textarea.select();
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(item.link);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                } catch (err) {
+                  console.error("Copy failed:", err);
+                  // Fallback method
+                  const textArea = document.createElement("textarea");
+                  textArea.value = item.link;
+                  textArea.style.position = "fixed";
+                  textArea.style.left = "-999999px";
+                  document.body.appendChild(textArea);
+                  textArea.focus();
+                  textArea.select();
                   try {
-                    document.execCommand("copy");
-                    console.log("Fallback copy success:", item.link);
-                  } catch (err) {
-                    console.error("Fallback copy failed:", err);
+                    document.execCommand('copy');
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  } catch (err2) {
+                    console.error("Fallback copy failed:", err2);
+                    alert("Gagal menyalin link. Silakan copy manual.");
                   }
-                  document.body.removeChild(textarea);
+                  document.body.removeChild(textArea);
                 }
               }}
               aria-label="Copy link"
+              title={copied ? "Copied!" : "Copy link"}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2" stroke="currentColor" strokeWidth="2" />
-                <path d="M8 16h8a2 2 0 002-2v-8" stroke="currentColor" strokeWidth="2" />
-              </svg>
+              {copied ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2" stroke="currentColor" strokeWidth="2" />
+                  <path d="M8 16h8a2 2 0 002-2v-8" stroke="currentColor" strokeWidth="2" />
+                </svg>
+              )}
             </Button>
             <Button
               variant="outline"

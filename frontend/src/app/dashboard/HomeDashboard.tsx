@@ -21,6 +21,21 @@ interface Announcement {
     updated_at: string
 }
 
+interface ServiceStatus {
+    port: number
+    status: "up" | "down"
+}
+
+interface HealthCheckResponse {
+    status: string
+    services: {
+        scrape_service?: ServiceStatus
+        reasoning_service?: ServiceStatus
+        chat_service?: ServiceStatus
+        obj_detection_service?: ServiceStatus
+    }
+}
+
 interface SummaryProps {
     data: LinkRecord[]
     onGoToAll?: () => void // pindah ke tab "all"
@@ -37,6 +52,10 @@ export default function SummaryDashboard({ data, onGoToAll }: SummaryProps) {
     const [totalAnnouncements, setTotalAnnouncements] = useState(0)
     const [loadingAnnouncements, setLoadingAnnouncements] = useState(true)
     const announcementsPerPage = 3
+
+    // Service health check states
+    const [serviceHealth, setServiceHealth] = useState<HealthCheckResponse | null>(null)
+    const [healthCheckLoading, setHealthCheckLoading] = useState(true)
 
     // Fetch announcements
     useEffect(() => {
@@ -70,6 +89,35 @@ export default function SummaryDashboard({ data, onGoToAll }: SummaryProps) {
 
         fetchAnnouncements()
     }, [announcementPage])
+
+    // Fetch service health status every 10 seconds
+    useEffect(() => {
+        const fetchServiceHealth = async () => {
+            try {
+                const response = await fetch("/api/health-check")
+
+                if (response.ok) {
+                    const data: HealthCheckResponse = await response.json()
+                    setServiceHealth(data)
+                } else {
+                    console.error("Failed to fetch service health:", response.statusText)
+                }
+            } catch (error) {
+                console.error("Error fetching service health:", error)
+            } finally {
+                setHealthCheckLoading(false)
+            }
+        }
+
+        // Fetch immediately on mount
+        fetchServiceHealth()
+
+        // Set up polling every 10 seconds
+        const intervalId = setInterval(fetchServiceHealth, 10000)
+
+        // Cleanup on unmount
+        return () => clearInterval(intervalId)
+    }, [])
 
     if (!data) return null
 
@@ -251,37 +299,91 @@ export default function SummaryDashboard({ data, onGoToAll }: SummaryProps) {
                     <p className="text-sm text-muted-foreground">Unverified</p>
                     <p className="text-2xl font-bold">{unverified}</p>
                 </Card>
+
                 <Card className="p-4">
-                    <p className="text-sm text-muted-foreground mb-2">Generator Service</p>
+                    <p className="text-sm text-muted-foreground mb-2">Scrape Service</p>
                     <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-                        <p className="text-xl font-bold">Aktif</p>
+                        {healthCheckLoading ? (
+                            <div className="w-3 h-3 rounded-full bg-gray-300 animate-pulse"></div>
+                        ) : (
+                            <div className={`w-3 h-3 rounded-full ${serviceHealth?.services?.scrape_service?.status === "up"
+                                ? "bg-green-500 animate-pulse"
+                                : "bg-gray-400"
+                                }`}></div>
+                        )}
+                        <p className="text-xl font-bold">
+                            {healthCheckLoading
+                                ? "..."
+                                : serviceHealth?.services?.scrape_service?.status === "up"
+                                    ? "Aktif"
+                                    : "Off"}
+                        </p>
                     </div>
                 </Card>
 
                 <Card className="p-4">
                     <p className="text-sm text-muted-foreground mb-2">Reasoning Service</p>
                     <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-                        <p className="text-xl font-bold">Aktif</p>
+                        {healthCheckLoading ? (
+                            <div className="w-3 h-3 rounded-full bg-gray-300 animate-pulse"></div>
+                        ) : (
+                            <div className={`w-3 h-3 rounded-full ${serviceHealth?.services?.reasoning_service?.status === "up"
+                                ? "bg-green-500 animate-pulse"
+                                : "bg-gray-400"
+                                }`}></div>
+                        )}
+                        <p className="text-xl font-bold">
+                            {healthCheckLoading
+                                ? "..."
+                                : serviceHealth?.services?.reasoning_service?.status === "up"
+                                    ? "Aktif"
+                                    : "Off"}
+                        </p>
                     </div>
                 </Card>
 
                 <Card className="p-4">
                     <p className="text-sm text-muted-foreground mb-2">Detection Service</p>
                     <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-gray-400"></div>
-                        <p className="text-xl font-bold">Off</p>
+                        {healthCheckLoading ? (
+                            <div className="w-3 h-3 rounded-full bg-gray-300 animate-pulse"></div>
+                        ) : (
+                            <div className={`w-3 h-3 rounded-full ${serviceHealth?.services?.obj_detection_service?.status === "up"
+                                ? "bg-green-500 animate-pulse"
+                                : "bg-gray-400"
+                                }`}></div>
+                        )}
+                        <p className="text-xl font-bold">
+                            {healthCheckLoading
+                                ? "..."
+                                : serviceHealth?.services?.obj_detection_service?.status === "up"
+                                    ? "Aktif"
+                                    : "Off"}
+                        </p>
                     </div>
                 </Card>
 
                 <Card className="p-4">
                     <p className="text-sm text-muted-foreground mb-2">ChatAI Service</p>
                     <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-                        <p className="text-xl font-bold">Aktif</p>
+                        {healthCheckLoading ? (
+                            <div className="w-3 h-3 rounded-full bg-gray-300 animate-pulse"></div>
+                        ) : (
+                            <div className={`w-3 h-3 rounded-full ${serviceHealth?.services?.chat_service?.status === "up"
+                                ? "bg-green-500 animate-pulse"
+                                : "bg-gray-400"
+                                }`}></div>
+                        )}
+                        <p className="text-xl font-bold">
+                            {healthCheckLoading
+                                ? "..."
+                                : serviceHealth?.services?.chat_service?.status === "up"
+                                    ? "Aktif"
+                                    : "Off"}
+                        </p>
                     </div>
                 </Card>
+
 
             </div>
 
