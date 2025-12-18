@@ -10,7 +10,7 @@ import sys
 from datetime import datetime
 from utils.auth_middleware import get_current_user
 from sqlalchemy import text
-from utils.db import engine 
+from db import engine 
 
 router = APIRouter()
 
@@ -59,76 +59,147 @@ class LogMessage(BaseModel):
 # =========================
 # CORE: RUN LOCAL CRAWLER
 # =========================
-async def run_local_crawler(
+async def run_runpod_crawler(
     job: CrawlerJob,
     keywords: list[str],
     domain_count: int,
     username: str
 ):
     """
-    Run crawler.py locally and stream logs + REAL summary.
+    Call RunPod API and stream logs + REAL summary.
     """
+    import httpx
+    
     summary = None
+    runpod_url = "https://l7i1ghaqgdha36-3000.proxy.runpod.net/process"
+    api_key = "tim6-secret-key-2025"
 
     try:
-        keywords_str = ",".join(keywords)
+        # Gunakan keyword pertama untuk dikirim ke RunPod
+        keyword_data = keywords[0] if keywords else ""
+        
+        await job.log(f"[INFO] Connecting to RunPod API...")
+        await job.log(f"[INFO] Keyword: {keyword_data}")
+        await job.log(f"[INFO] Domain count: {domain_count}")
 
-        # Path ke crawler.py
-        crawler_dir = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "domain-generator")
-        )
-        crawler_path = os.path.join(crawler_dir, "crawler.py")
+        # Prepare request payload
+        payload = {
+            "data": keyword_data,
+            "num_domains": domain_count
+        }
 
-        if not os.path.exists(crawler_path):
-            await job.error(f"crawler.py not found at {crawler_path}")
-            return
+        headers = {
+            "Content-Type": "application/json",
+            "X-API-Key": api_key
+        }
 
-        cmd = [
-            sys.executable,
-            crawler_path,
-            "-n", str(domain_count),
-            "-k", keywords_str,
-            "-u", username
-        ]
+        # Stream response from RunPod API
+        async with httpx.AsyncClient(timeout=600.0) as client:
+            async with client.stream("POST", runpod_url, json=payload, headers=headers) as response:
+                if response.status_code != 200:
+                    error_text = await response.aread()
+                    await job.error(f"RunPod API error: {response.status_code} - {error_text.decode()}")
+                    return
 
-        await job.log("[INFO] Starting local crawler")
-        await job.log(f"[INFO] Command: {' '.join(cmd)}")
+                await job.log("[INFO] Connected to RunPod API, streaming logs...")
+                
+                # Stream line by line
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    
+                    # Send log to UI
+                    await job.log(line)
+                    
+                    # Check for SUMMARY in the log
+                    if line.startswith("[SUMMARY]"):
+                        try:
+                            summary_json = line.replace("[SUMMARY]", "").strip()
+                            job.summary = json.loads(summary_json)
+                        except Exception as e:
+                            await job.error(f"Failed to parse summary JSON: {str(e)}")
 
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-            cwd=crawler_dir
-        )
-
-        # Stream stdout line by line
-        while True:
-            line = await process.stdout.readline()
-            if not line:
-                break
-
-            decoded = line.decode("utf-8", errors="ignore").rstrip()
-            await job.log(decoded)
-
-            # === AMBIL SUMMARY ASLI DARI CRAWLER ===
-            if decoded.startswith("[SUMMARY]"):
-                try:
-                    summary_json = decoded.replace("[SUMMARY]", "").strip()
-                    job.summary = json.loads(summary_json) 
-                except Exception as e:
-                    await job.error(f"Failed to parse summary JSON: {str(e)}")
-
-        await process.wait()
-
-        if summary is None:
-            await job.error("Crawler finished but [SUMMARY] not found")
-        else:
-            # Pastikan summary dikirim ke UI
-            await job.log(f"[SUMMARY] {json.dumps(summary)}")
-
+        # If no summary was found, create a basic one
+        if job.summary is None:
+            await job.log("[INFO] Crawler finished")
+        
+    except httpx.TimeoutException:
+        await job.error("RunPod API request timeout")
+    except httpx.RequestError as e:
+        await job.error(f"RunPod API connection error: {str(e)}")
     except Exception as e:
-        await job.error(f"Exception while running crawler: {str(e)}")
+        await job.error(f"Exception while calling RunPod API: {str(e)}")
+    finally:
+        await job.finish()
 
+
+# =========================
+# CORE: RUN RUNPOD MANUAL CRAWLER
+# =========================
+async def run_runpod_manual_crawler(
+    job: CrawlerJob,
+    domains: list[str],
+    username: str
+):
+    """
+    Call RunPod API /process-links and stream logs for manual domain input.
+    """
+    import httpx
+    
+    summary = None
+    runpod_url = "https://l7i1ghaqgdha36-3000.proxy.runpod.net/process-links"
+    api_key = "tim6-secret-key-2025"
+
+    try:
+        await job.log(f"[INFO] Connecting to RunPod API (Manual Mode)...")
+        await job.log(f"[INFO] Processing {len(domains)} domains")
+
+        # Prepare request payload
+        payload = {
+            "links": domains
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "X-API-Key": api_key
+        }
+
+        # Stream response from RunPod API
+        async with httpx.AsyncClient(timeout=600.0) as client:
+            async with client.stream("POST", runpod_url, json=payload, headers=headers) as response:
+                if response.status_code != 200:
+                    error_text = await response.aread()
+                    await job.error(f"RunPod API error: {response.status_code} - {error_text.decode()}")
+                    return
+
+                await job.log("[INFO] Connected to RunPod API, streaming logs...")
+                
+                # Stream line by line
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    
+                    # Send log to UI
+                    await job.log(line)
+                    
+                    # Check for SUMMARY in the log
+                    if line.startswith("[SUMMARY]"):
+                        try:
+                            summary_json = line.replace("[SUMMARY]", "").strip()
+                            job.summary = json.loads(summary_json)
+                        except Exception as e:
+                            await job.error(f"Failed to parse summary JSON: {str(e)}")
+
+        # If no summary was found, create a basic one
+        if job.summary is None:
+            await job.log("[INFO] Crawler finished")
+        
+    except httpx.TimeoutException:
+        await job.error("RunPod API request timeout")
+    except httpx.RequestError as e:
+        await job.error(f"RunPod API connection error: {str(e)}")
+    except Exception as e:
+        await job.error(f"Exception while calling RunPod API: {str(e)}")
     finally:
         await job.finish()
 
@@ -151,7 +222,7 @@ async def start_crawler(
     job = CrawlerJob(job_id)
 
     job.task = asyncio.create_task(
-        run_local_crawler(
+        run_runpod_crawler(
             job=job,
             keywords=request.keywords,
             domain_count=request.domain_count,
@@ -165,6 +236,37 @@ async def start_crawler(
         "job_id": job_id,
         "status": "started",
         "message": "Crawler started locally"
+    }
+
+
+# =========================
+# API: START MANUAL CRAWLER
+# =========================
+@router.post("/manual")
+async def start_manual_crawler(
+    request: ManualCrawlerRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    if not request.domains:
+        raise HTTPException(status_code=400, detail="Domains cannot be empty")
+
+    job_id = str(uuid.uuid4())
+    job = CrawlerJob(job_id)
+
+    job.task = asyncio.create_task(
+        run_runpod_manual_crawler(
+            job=job,
+            domains=request.domains,
+            username=current_user.get("username", "system")
+        )
+    )
+
+    active_jobs[job_id] = job
+
+    return {
+        "job_id": job_id,
+        "status": "started",
+        "message": "Manual crawler started"
     }
 
 
