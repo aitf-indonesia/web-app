@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Call RunPod API /process endpoint
-        const response = await fetch('https://l7i1ghaqgdha36-3000.proxy.runpod.net/process', {
+        const runpodBaseUrl = process.env.RUNPOD_API_URL || 'https://l7i1ghaqgdha36-3000.proxy.runpod.net'
+        const response = await fetch(`${runpodBaseUrl}/process`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

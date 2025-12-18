@@ -71,7 +71,8 @@ async def run_runpod_crawler(
     import httpx
     
     summary = None
-    runpod_url = "https://l7i1ghaqgdha36-3000.proxy.runpod.net/process"
+    runpod_base_url = os.getenv("RUNPOD_API_URL", "https://l7i1ghaqgdha36-3000.proxy.runpod.net")
+    runpod_url = f"{runpod_base_url}/process"
     api_key = "tim6-secret-key-2025"
 
     try:
@@ -169,7 +170,8 @@ async def run_runpod_manual_crawler(
     import httpx
     
     summary = None
-    runpod_url = "https://l7i1ghaqgdha36-3000.proxy.runpod.net/process-links"
+    runpod_base_url = os.getenv("RUNPOD_API_URL", "https://l7i1ghaqgdha36-3000.proxy.runpod.net")
+    runpod_url = f"{runpod_base_url}/process-links"
     api_key = "tim6-secret-key-2025"
 
     try:

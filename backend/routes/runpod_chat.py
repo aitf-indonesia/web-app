@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 import requests
+import os
 from typing import Optional
 
 router = APIRouter()
@@ -18,8 +19,9 @@ def runpod_chat_proxy(request: RunPodChatRequest):
     Proxy endpoint for RunPod chat API to avoid CORS issues
     """
     try:
+        runpod_base_url = os.getenv("RUNPOD_API_URL", "https://l7i1ghaqgdha36-3000.proxy.runpod.net")
         response = requests.post(
-            "https://l7i1ghaqgdha36-3000.proxy.runpod.net/chat",
+            f"{runpod_base_url}/chat",
             headers={
                 "Content-Type": "application/json",
                 "X-API-Key": "tim6-secret-key-2025"
