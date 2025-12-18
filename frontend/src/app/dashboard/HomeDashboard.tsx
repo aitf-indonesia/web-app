@@ -430,9 +430,9 @@ export default function SummaryDashboard({ data, onGoToAll }: SummaryProps) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {latest.map((d) => (
+                                {latest.map((d, index) => (
                                     <tr
-                                        key={d.id}
+                                        key={index}
                                         className="border-b last:border-0 cursor-pointer hover:bg-muted/40"
                                         onClick={() => router.push(`/links/${d.id}`)}
                                     >

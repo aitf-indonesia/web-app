@@ -27,6 +27,77 @@ function toHexId(n: number) {
   return `#${hex}`
 }
 
+function getImageSrc(imageData: string | null | undefined): string | null {
+  if (!imageData) {
+    console.log('[getImageSrc] No image data provided')
+    return null
+  }
+
+  console.log('[getImageSrc] Processing image data:', imageData.substring(0, 100) + '...')
+
+  // Check if it's already a complete data URL
+  if (imageData.startsWith('data:image/')) {
+    console.log('[getImageSrc] Already a data URL')
+    return imageData
+  }
+
+  // Check if it's a file path (contains /)
+  if (imageData.includes('/')) {
+    console.log('[getImageSrc] Detected as file path')
+
+    // Extract just the filename from the full path
+    // Handle both Unix and Windows paths
+    const pathParts = imageData.split(/[/\\]/)
+    const filename = pathParts[pathParts.length - 1]
+
+    console.log('[getImageSrc] Extracted filename:', filename)
+
+    // If filename is empty or looks invalid, return null
+    if (!filename || filename.trim() === '') {
+      console.error('[getImageSrc] Invalid filename extracted')
+      return null
+    }
+
+    // Construct API URL - use relative path for proper proxying
+    const fullUrl = `/api/images/detection/${filename}`
+    console.log('[getImageSrc] Constructed URL:', fullUrl)
+    return fullUrl
+  }
+
+  // Assume it's base64 data
+  console.log('[getImageSrc] Treating as base64 data')
+
+  // Remove any whitespace
+  const cleanBase64 = imageData.replace(/\s/g, '')
+
+  // Detect image format from base64 magic bytes
+  let mimeType = 'image/png' // default
+
+  if (cleanBase64.startsWith('/9j/') || cleanBase64.startsWith('iVBORw0KG')) {
+    mimeType = cleanBase64.startsWith('/9j/') ? 'image/jpeg' : 'image/png'
+    console.log('[getImageSrc] Detected format from prefix:', mimeType)
+  } else {
+    // Try to decode first few bytes to detect format
+    try {
+      const firstChars = cleanBase64.substring(0, 20)
+      if (firstChars.includes('iVBOR')) {
+        mimeType = 'image/png'
+      } else if (firstChars.includes('R0lGOD')) {
+        mimeType = 'image/gif'
+      } else if (firstChars.includes('Qk0') || firstChars.includes('Qk1')) {
+        mimeType = 'image/bmp'
+      }
+      console.log('[getImageSrc] Detected format from content:', mimeType)
+    } catch (e) {
+      console.warn('[getImageSrc] Could not detect format, using default PNG')
+    }
+  }
+
+  const dataUrl = `data:${mimeType};base64,${cleanBase64}`
+  console.log('[getImageSrc] Created data URL with length:', dataUrl.length)
+  return dataUrl
+}
+
 export default function DetailModal({
   item,
   onClose,
@@ -52,6 +123,18 @@ export default function DetailModal({
   useEffect(() => {
     setContextMode(false)
     setSelectedContexts([])
+  }, [item])
+
+  // Debug: Log image data when item changes
+  useEffect(() => {
+    if (item?.image) {
+      console.log('[DetailModal] Item image value:', item.image)
+      console.log('[DetailModal] Image type:', typeof item.image)
+      console.log('[DetailModal] Image length:', item.image.length)
+      console.log('[DetailModal] First 200 chars:', item.image.substring(0, 200))
+    } else {
+      console.log('[DetailModal] No image data in item')
+    }
   }, [item])
 
   // Fetch chat history from database
@@ -198,18 +281,65 @@ export default function DetailModal({
     setContextMode(false)
 
     try {
-      // Use apiPost to ensure authentication token is included
-      const data = await apiPost("/api/chat", {
-        question: finalMsg,
-        item,
+      // Save user message to database first
+      await apiPost(`/api/chat/history/${item.id}`, {
         username: user.username,
-        mode: chatMode
+        role: "user",
+        message: finalMsg
       })
+
+      // Call RunPod API via proxy endpoint
+      let aiReply = ""
+      try {
+        // Get auth token
+        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+
+        const response = await fetch("/api/runpod-chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { "Authorization": `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({
+            query: finalMsg,
+            category: chatMode === "hukum" ? "hukum" : "edukasi",
+            k: 5,
+            max_new_tokens: 512,
+            temperature: 0.1
+          })
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+          throw new Error(errorData.error || `HTTP ${response.status}`)
+        }
+
+        const data = await response.json()
+        aiReply = data.answer || data.response || data.reply || "Maaf, tidak ada balasan dari AI."
+      } catch (fetchErr: any) {
+        console.error("RunPod API fetch error:", fetchErr)
+
+        // More detailed error message
+        if (fetchErr.message.includes('502')) {
+          throw new Error("API RunPod sedang tidak tersedia (502 Bad Gateway). Silakan coba lagi nanti.")
+        } else if (fetchErr.message.includes('503')) {
+          throw new Error("API RunPod sedang dalam maintenance (503 Service Unavailable). Silakan coba lagi nanti.")
+        } else {
+          throw new Error(fetchErr.message || "Tidak dapat terhubung ke API RunPod.")
+        }
+      }
 
       setChat((c) => [
         ...c,
-        { role: "assistant", text: data.reply ?? "Maaf, tidak ada balasan.", ts: Date.now(), link: item.link },
+        { role: "assistant", text: aiReply, ts: Date.now(), link: item.link },
       ])
+
+      // Save AI response to database
+      await apiPost(`/api/chat/history/${item.id}`, {
+        username: user.username,
+        role: "assistant",
+        message: aiReply
+      })
 
       // Refresh chat history from database
       mutateChat()
@@ -223,16 +353,16 @@ export default function DetailModal({
         { role: "assistant", text: errorMessage, ts: Date.now(), link: item.link },
       ])
 
-      // Even if AI fails, try to save user message to database
+      // Try to save error message to database
       try {
         await apiPost(`/api/chat/history/${item.id}`, {
           username: user.username,
-          role: "user",
-          message: finalMsg
+          role: "assistant",
+          message: errorMessage
         })
         mutateChat()
       } catch (saveErr) {
-        console.error("Failed to save user message:", saveErr)
+        console.error("Failed to save error message:", saveErr)
       }
     } finally {
       setLoading(false)
@@ -580,17 +710,18 @@ export default function DetailModal({
                           </div>
                         )}
                         <img
-                          src={(() => {
-                            const pathParts = item.image.split('/')
-                            const filename = pathParts[pathParts.length - 1]
-                            // Use relative URL for Nginx proxying
-                            const apiUrl = process.env.NEXT_PUBLIC_API_URL || ''
-                            return `${apiUrl}/api/images/detection/${filename}`
-                          })()}
+                          src={getImageSrc(item.image) || ''}
                           alt="Hasil deteksi object detection"
                           className="rounded-md w-full h-auto object-contain"
-                          onLoad={() => setImageLoading(false)}
-                          onError={() => setImageLoading(false)}
+                          onLoad={() => {
+                            console.log('[Image] Successfully loaded')
+                            setImageLoading(false)
+                          }}
+                          onError={(e) => {
+                            console.error('[Image] Failed to load:', e)
+                            console.error('[Image] Source was:', getImageSrc(item.image))
+                            setImageLoading(false)
+                          }}
                           style={{ display: imageLoading ? 'none' : 'block' }}
                         />
                       </div>
@@ -988,12 +1119,7 @@ export default function DetailModal({
             </svg>
           </button>
           <img
-            src={(() => {
-              const pathParts = item.image.split('/')
-              const filename = pathParts[pathParts.length - 1]
-              const apiUrl = process.env.NEXT_PUBLIC_API_URL || ''
-              return `${apiUrl}/api/images/detection/${filename}`
-            })()}
+            src={getImageSrc(item.image) || ''}
             alt="Hasil deteksi object detection - Zoom"
             className="max-w-full max-h-full object-contain"
             onClick={(e) => e.stopPropagation()}

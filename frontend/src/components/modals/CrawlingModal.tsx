@@ -72,8 +72,10 @@ export default function CrawlingModal({
 
     // Result tab state
     const [summary, setSummary] = useState<GeneratorSummary | null>(null)
+    const [generatedDomains, setGeneratedDomains] = useState<string[]>([])
+    const [sendingToRunPod, setSendingToRunPod] = useState(false)
 
-    const logsEndRef = useRef<HTMLDivElement>(null)
+    const logsEndRef = useRef<HTMLDivElement | null>(null)
     const eventSourceRef = useRef<EventSource | null>(null)
     const timerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -259,6 +261,42 @@ export default function CrawlingModal({
         }
     }
 
+    async function sendKeywordsToRunPod(keywordData: string, numDomains: number) {
+        if (!keywordData || keywordData.trim() === "") {
+            console.log("No keyword to send to RunPod")
+            return
+        }
+
+        try {
+            setSendingToRunPod(true)
+            setLogs((prev: string[]) => [...prev, `[INFO] Sending keyword "${keywordData}" with ${numDomains} domains to RunPod API for processing...`])
+
+            const response = await fetch("/api/runpod-process", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    data: keywordData,
+                    num_domains: numDomains
+                })
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+                throw new Error(errorData.error || `HTTP ${response.status}`)
+            }
+
+            const data = await response.json()
+            setLogs((prev) => [...prev, `[SUCCESS] RunPod API response: ${JSON.stringify(data)}`])
+        } catch (error: any) {
+            console.error("Failed to send keyword to RunPod:", error)
+            setLogs((prev: string[]) => [...prev, `[ERROR] Failed to send to RunPod: ${error.message}`])
+        } finally {
+            setSendingToRunPod(false)
+        }
+    }
+
     async function handleGenerate() {
         try {
             setLogs([])
@@ -274,21 +312,23 @@ export default function CrawlingModal({
             // Get auth token
             const token = localStorage.getItem("auth_token")
             if (!token) {
-                setLogs((prev) => [...prev, "[ERROR] Not authenticated"])
+                setLogs((prev: string[]) => [...prev, "[ERROR] Not authenticated"])
                 return
             }
 
             let endpoint = "/api/crawler/start"
             let body = {}
+            let usedKeywords: string[] = []
 
             if (inputMode === "search") {
                 const searchKeywords = keywords.split(/[,\n]/).map(k => k.trim()).filter(k => k)
                 if (searchKeywords.length === 0) {
-                    setLogs((prev) => [...prev, "[ERROR] No keywords provided"])
+                    setLogs((prev: string[]) => [...prev, "[ERROR] No keywords provided"])
                     // Reset to detail tab after error
                     setTimeout(() => setActiveTab("detail"), 2000)
                     return
                 }
+                usedKeywords = searchKeywords
                 body = {
                     domain_count: domainCount,
                     keywords: searchKeywords,
@@ -364,14 +404,20 @@ export default function CrawlingModal({
                         const parsedSummary = JSON.parse(summaryJson)
                         setSummary(parsedSummary)
                         setIsCompleted(true)
-                        setLogs((prev) => [...prev, "", `[INFO] Crawling completed! This will automatically continue in ${countdown} seconds...`])
+                        setLogs((prev: string[]) => [...prev, "", `[INFO] Crawling completed! This will automatically continue in ${countdown} seconds...`])
+
+                        // Send keyword to RunPod API if we have generated domains and used keywords
+                        if (parsedSummary.domains_generated && parsedSummary.domains_generated.success > 0 && usedKeywords.length > 0) {
+                            // Send the first keyword to RunPod with domain count
+                            sendKeywordsToRunPod(usedKeywords[0], domainCount)
+                        }
                     } catch (e) {
                         console.error("Failed to parse summary:", e)
                     }
                 }
 
                 // Add log line
-                setLogs((prev) => [...prev, line])
+                setLogs((prev: string[]) => [...prev, line])
             }
 
             eventSource.onerror = (error) => {

@@ -46,10 +46,6 @@ export default function DataTable({
   sortOrder,
   onSort,
   compactMode = false,
-  selectionMode = false,
-  selectedIds = new Set(),
-  onToggleSelect,
-  onToggleSelectAll,
 }: {
   pageItems: LinkRecord[]
   isLoading: boolean
@@ -59,10 +55,6 @@ export default function DataTable({
   sortOrder?: "asc" | "desc"
   onSort?: (col: "tanggal" | "kepercayaan" | "lastModified" | "modifiedBy") => void
   compactMode?: boolean
-  selectionMode?: boolean
-  selectedIds?: Set<number>
-  onToggleSelect?: (id: number) => void
-  onToggleSelectAll?: () => void
 }) {
   const SortIcon = ({ column }: { column: "tanggal" | "kepercayaan" | "lastModified" | "modifiedBy" }) => {
     if (sortCol !== column) {
@@ -92,16 +84,6 @@ export default function DataTable({
     <table className={cn("w-full", compactMode ? "text-xs" : "text-sm")}>
       <thead className="bg-muted text-foreground/80">
         <tr>
-          {selectionMode && (
-            <th className={cn("px-4 text-center font-medium w-[50px]", compactMode ? "py-2" : "py-3")}>
-              <input
-                type="checkbox"
-                checked={pageItems.length > 0 && selectedIds.size === pageItems.length}
-                onChange={onToggleSelectAll}
-                className="cursor-pointer w-4 h-4"
-              />
-            </th>
-          )}
           <th className={cn("px-4 text-left font-medium w-[31%]", compactMode ? "py-2" : "py-3")}>Link Domain</th>
           <th
             className={cn("px-4 text-left font-medium w-[12%]", compactMode ? "py-2" : "py-3", onSort ? 'cursor-pointer hover:bg-muted-foreground/10 select-none' : '')}
@@ -138,39 +120,28 @@ export default function DataTable({
       <tbody>
         {isLoading && (
           <tr>
-            <td colSpan={selectionMode ? 8 : 7} className="px-4 py-6 text-center text-foreground/60">Loading...</td>
+            <td colSpan={7} className="px-4 py-6 text-center text-foreground/60">Loading...</td>
           </tr>
         )}
         {error && (
           <tr>
-            <td colSpan={selectionMode ? 8 : 7} className="px-4 py-6 text-center text-destructive">
+            <td colSpan={7} className="px-4 py-6 text-center text-destructive">
               Failed to load data: {error?.message || JSON.stringify(error)}
             </td>
           </tr>
         )}
         {!isLoading && !error && pageItems.length === 0 && (
           <tr>
-            <td colSpan={selectionMode ? 8 : 7} className="px-4 py-10 text-center text-foreground/60">
+            <td colSpan={7} className="px-4 py-10 text-center text-foreground/60">
               Tidak ada data yang cocok dengan kriteria.
             </td>
           </tr>
         )}
-        {pageItems.map((it) => {
+        {pageItems.map((it, index) => {
           const conf = it.kepercayaan
           const cellPadding = compactMode ? "py-1.5" : "py-3"
           return (
-            <tr key={it.id} className="border-t border-border hover:bg-muted/40">
-              {selectionMode && (
-                <td className={cn("px-4 text-center w-[50px]", cellPadding)}>
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(it.id)}
-                    onChange={() => onToggleSelect?.(it.id)}
-                    className="cursor-pointer w-4 h-4"
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </td>
-              )}
+            <tr key={index} className="border-t border-border hover:bg-muted/40">
               <td className={cn("px-4 font-medium w-[31%] max-w-0", cellPadding)}>
                 <div className="flex flex-col gap-0.5 overflow-hidden">
                   <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -240,6 +211,6 @@ export default function DataTable({
           )
         })}
       </tbody>
-    </table>
+    </table >
   )
 }
