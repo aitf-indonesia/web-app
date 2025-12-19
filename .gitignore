@@ -53,7 +53,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Others
-# archives/
+archives/
 db_information.txt
 .ipynb_checkpoints/
 
@@ -74,7 +74,9 @@ database/migrations/*.bak
 postgres_data/
 screenshots/
 
-# Docker environment (local overrides only)
+# Docker environment files
+.env
+.env.docker
 .env.docker.local
 .env.local
 
