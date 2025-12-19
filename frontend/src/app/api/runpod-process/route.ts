@@ -42,7 +42,24 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        const data = await response.json()
+        // Try to parse as JSON first, fallback to text
+        const contentType = response.headers.get('content-type')
+        let data: any
+
+        if (contentType?.includes('application/json')) {
+            try {
+                data = await response.json()
+            } catch (e) {
+                // If JSON parsing fails, treat as text
+                const textData = await response.text()
+                data = { message: textData, status: 'success' }
+            }
+        } else {
+            // Non-JSON response, treat as text
+            const textData = await response.text()
+            data = { message: textData, status: 'success' }
+        }
+
         return NextResponse.json(data)
     } catch (error: any) {
         console.error('RunPod process proxy error:', error)

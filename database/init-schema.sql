@@ -379,7 +379,7 @@ CREATE TABLE public.results (
     url text,
     keywords text,
     reasoning_text text,
-    image_final_path character varying(512),
+    image_final_path text,
     label_final boolean,
     final_confidence numeric(4,1),
     status character varying(20) DEFAULT 'unverified'::character varying,
