@@ -5,7 +5,7 @@ Pengawasan Ruang Digital (PRD) Analyst is a comprehensive monitoring and analysi
 ## Key Features
 
 - **Dashboard Monitoring** - Real-time overview of detected gambling sites with statistics and analytics
-- **AI-Powered Classification** - Automated content analysis using Google Gemini API
+- **AI-Powered Classification** - Automated content analysis using KomdigiUB-8B
 - **Domain Generator** - Intelligent keyword-based domain discovery via RunPod API integration
 - **Service Health Monitoring** - Real-time status tracking of all backend services
 - **Interactive Chatbot** - AI assistant for content analysis and verification
@@ -60,8 +60,7 @@ For VPS/RunPod deployment without Docker, see archived guides in `archives/vps-d
 │                                             │
 │  Backend (FastAPI)                          │
 │      ├─ REST API Endpoints                  │
-│      ├─ RunPod API Integration              │
-│      └─ Google Gemini AI Integration        │
+│      └─ RunPod API Integration              │
 │                                             │
 │  Frontend (Next.js)                         │
 │      ├─ Dashboard UI                        │
@@ -72,10 +71,11 @@ For VPS/RunPod deployment without Docker, see archived guides in `archives/vps-d
 │      └─ Persistent Data Storage             │
 │                                             │
 └─────────────────────────────────────────────┘
-         ↓                    ↓
-   External APIs        RunPod Services
-   - Gemini API        - Domain Crawler
-                       - Health Check
+         ↓                    
+      RunPod Services
+      - Domain Crawler
+      - Health Check
+      - KomdigiUB-8B
 ```
 
 ## Project Structure
@@ -150,9 +150,6 @@ prototype-dashboard-chatbot/
 # Database Configuration
 DATABASE_URL=postgresql://user:password@postgres:5432/dbname
 
-# API Keys
-GEMINI_API_KEY=your_gemini_api_key_here
-
 # RunPod API Configuration
 RUNPOD_API_URL=https://your-runpod-instance.proxy.runpod.net
 
@@ -170,7 +167,7 @@ Frontend environment variables are configured via Next.js and proxied through th
 The dashboard includes real-time health monitoring for all services:
 
 - **Database** - PostgreSQL connection status
-- **Gemini API** - AI service availability
+- **KomdigiUB-8B** - AI service availability
 - **RunPod API** - External crawler service status
 - **Screenshot Service** - Selenium/Chrome driver status
 
