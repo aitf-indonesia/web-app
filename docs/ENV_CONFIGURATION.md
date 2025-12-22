@@ -11,7 +11,7 @@ Create a `.env` file in the `backend/` directory with the following variables:
 DATABASE_URL=sqlite:///./test.db
 
 # RunPod API Configuration
-SERVICE_API_URL=https://l7i1ghaqgdha36-3000.proxy.runpod.net
+SERVICE_API_URL=https://u8kbd3xdry7kld-3000.proxy.runpod.net
 
 # JWT Secret (generate using: python generate_hash.py)
 SECRET_KEY=your-secret-key-here
@@ -22,7 +22,7 @@ SECRET_KEY=your-secret-key-here
 | Variable | Description | Default Value |
 |----------|-------------|---------------|
 | `DATABASE_URL` | Database connection string | `sqlite:///./test.db` |
-| `SERVICE_API_URL` | Base URL for RunPod API | `https://l7i1ghaqgdha36-3000.proxy.runpod.net` |
+| `SERVICE_API_URL` | Base URL for RunPod API | `https://u8kbd3xdry7kld-3000.proxy.runpod.net` |
 | `SECRET_KEY` | JWT secret key for authentication | Required |
 
 ## Frontend Configuration
@@ -34,7 +34,7 @@ Create a `.env.local` file in the `frontend/` directory with the following varia
 NEXT_PUBLIC_API_URL=http://localhost:8000
 
 # RunPod API URL (used by Next.js API routes)
-SERVICE_API_URL=https://l7i1ghaqgdha36-3000.proxy.runpod.net
+SERVICE_API_URL=https://u8kbd3xdry7kld-3000.proxy.runpod.net
 ```
 
 ### Frontend Environment Variables
@@ -42,7 +42,7 @@ SERVICE_API_URL=https://l7i1ghaqgdha36-3000.proxy.runpod.net
 | Variable | Description | Default Value |
 |----------|-------------|---------------|
 | `NEXT_PUBLIC_API_URL` | Backend API base URL | `http://localhost:8000` |
-| `SERVICE_API_URL` | RunPod API base URL (server-side only) | `https://l7i1ghaqgdha36-3000.proxy.runpod.net` |
+| `SERVICE_API_URL` | RunPod API base URL (server-side only) | `https://u8kbd3xdry7kld-3000.proxy.runpod.net` |
 
 ## Setup Instructions
 

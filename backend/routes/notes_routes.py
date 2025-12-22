@@ -86,8 +86,8 @@ async def create_note(
     try:
         username = current_user.get("username")
         
-        # Check if domain exists
-        check_query = text("SELECT id_domain FROM generated_domains WHERE id_domain = :id_domain")
+        # Check if domain exists in results table (contains both manual and generated domains)
+        check_query = text("SELECT id_domain FROM results WHERE id_domain = :id_domain")
         existing = db.execute(check_query, {"id_domain": id_domain}).fetchone()
         
         if not existing:

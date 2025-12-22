@@ -71,7 +71,7 @@ async def run_runpod_crawler(
     import httpx
     
     summary = None
-    runpod_base_url = os.getenv("SERVICE_API_URL", "https://l7i1ghaqgdha36-3000.proxy.runpod.net")
+    runpod_base_url = os.getenv("SERVICE_API_URL", "https://u8kbd3xdry7kld-3000.proxy.runpod.net")
     runpod_url = f"{runpod_base_url}/process"
     api_key = os.getenv("SERVICE_API_KEY", "")
 
@@ -170,7 +170,7 @@ async def run_runpod_manual_crawler(
     import httpx
     
     summary = None
-    runpod_base_url = os.getenv("SERVICE_API_URL", "https://l7i1ghaqgdha36-3000.proxy.runpod.net")
+    runpod_base_url = os.getenv("SERVICE_API_URL", "https://u8kbd3xdry7kld-3000.proxy.runpod.net")
     runpod_url = f"{runpod_base_url}/process-links"
     api_key = os.getenv("SERVICE_API_KEY", "")
 

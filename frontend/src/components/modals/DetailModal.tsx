@@ -110,6 +110,8 @@ export default function DetailModal({
   const [message, setMessage] = useState("")
   const [loading, setLoading] = useState(false)
   const chatScrollRef = useRef<HTMLDivElement | null>(null)
+  const linkInputRef = useRef<HTMLInputElement | null>(null)
+
 
   type ChatMsg = { role: "user" | "assistant"; text: string; ts: number; link: string }
   const [chat, setChat] = useState<ChatMsg[]>([])
@@ -580,44 +582,31 @@ export default function DetailModal({
           {/* Link */}
           <div className="flex items-center gap-2 px-6 pb-4 rounded-b-xl">
             <Input
+              ref={linkInputRef}
               readOnly
               value={item.link}
               className="text-xs bg-white cursor-default"
               title={item.link}
-              onFocus={(e) => e.target.blur()}
             />
             <Button
               variant="outline"
               size="icon"
               className="bg-white hover:bg-gray-100"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(item.link);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                } catch (err) {
-                  console.error("Copy failed:", err);
-                  // Fallback method
-                  const textArea = document.createElement("textarea");
-                  textArea.value = item.link;
-                  textArea.style.position = "fixed";
-                  textArea.style.left = "-999999px";
-                  document.body.appendChild(textArea);
-                  textArea.focus();
-                  textArea.select();
-                  try {
-                    document.execCommand('copy');
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  } catch (err2) {
-                    console.error("Fallback copy failed:", err2);
-                    alert("Gagal menyalin link. Silakan copy manual.");
-                  }
-                  document.body.removeChild(textArea);
-                }
+              onClick={() => {
+                if (!linkInputRef.current) return
+
+                linkInputRef.current.focus()
+                linkInputRef.current.select()
+                linkInputRef.current.setSelectionRange(
+                  0,
+                  linkInputRef.current.value.length
+                )
+
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
               }}
               aria-label="Copy link"
-              title={copied ? "Copied!" : "Copy link"}
+              title={copied ? "Press Ctrl + C to copy" : "Select link"}
             >
               {copied ? (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

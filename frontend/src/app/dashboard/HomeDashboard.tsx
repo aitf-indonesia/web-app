@@ -343,7 +343,7 @@ export default function SummaryDashboard({ data, onGoToAll }: SummaryProps) {
                 </Card>
 
                 <Card className="p-4">
-                    <p className="text-sm text-muted-foreground mb-2">Detection Service</p>
+                    <p className="text-sm text-muted-foreground mb-2">Vision Service</p>
                     <div className="flex items-center gap-2">
                         {healthCheckLoading ? (
                             <div className="w-3 h-3 rounded-full bg-gray-300 animate-pulse"></div>
@@ -390,7 +390,7 @@ export default function SummaryDashboard({ data, onGoToAll }: SummaryProps) {
             {/* Domain Masuk Per Hari */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
                 <LineBase
-                    title="Domain masuk & Verifikasi per hari"
+                    title="Domain Masuk & Verifikasi per Hari"
                     labels={crawledLabels}
                     datasets={[
                         {
@@ -502,7 +502,7 @@ export default function SummaryDashboard({ data, onGoToAll }: SummaryProps) {
                 <Card className="p-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h2 className="text-lg font-semibold">Domain terbaru diproses</h2>
+                            <h2 className="text-lg font-semibold">Domain Terbaru</h2>
                             <p className="text-xs text-muted-foreground">
                                 {latest.length} Domain Terbaru
                             </p>

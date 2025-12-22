@@ -21,6 +21,8 @@ interface GeneratorSummary {
     screenshot: { success: number; failed: number; skipped: number; total: number }
     domains_inserted: number
     keywords: string[]
+    detection_api?: { success: number; failed: number; total: number }
+    reasoning_api?: { success: number; failed: number; total: number }
 }
 
 export default function CrawlingModal({
@@ -74,6 +76,25 @@ export default function CrawlingModal({
     const [summary, setSummary] = useState<GeneratorSummary | null>(null)
     const [generatedDomains, setGeneratedDomains] = useState<string[]>([])
     const [sendingToRunPod, setSendingToRunPod] = useState(false)
+
+    // Service health state
+    interface ServiceStatus {
+        port: number
+        status: "up" | "down"
+    }
+
+    interface HealthCheckResponse {
+        status: string
+        services: {
+            scrape_service?: ServiceStatus
+            reasoning_service?: ServiceStatus
+            chat_service?: ServiceStatus
+            obj_detection_service?: ServiceStatus
+        }
+    }
+
+    const [serviceHealth, setServiceHealth] = useState<HealthCheckResponse | null>(null)
+    const [loadingHealth, setLoadingHealth] = useState(false)
 
     const logsEndRef = useRef<HTMLDivElement | null>(null)
     const eventSourceRef = useRef<EventSource | null>(null)
@@ -148,6 +169,31 @@ export default function CrawlingModal({
             setIsMinimized(false)
         }
     }, [open])
+
+    // Fetch service health when modal opens
+    useEffect(() => {
+        if (open && activeTab === "detail") {
+            fetchServiceHealth()
+        }
+    }, [open, activeTab])
+
+    async function fetchServiceHealth() {
+        try {
+            setLoadingHealth(true)
+            const response = await fetch('/api/health-check')
+            if (!response.ok) {
+                throw new Error('Failed to fetch service health')
+            }
+            const data: HealthCheckResponse = await response.json()
+            setServiceHealth(data)
+        } catch (error) {
+            console.error('Failed to fetch service health:', error)
+            // Set null if fetch fails
+            setServiceHealth(null)
+        } finally {
+            setLoadingHealth(false)
+        }
+    }
 
 
     const keywordList = keywords.split(/[,\n]/).map(k => k.trim()).filter(k => k)
@@ -298,6 +344,28 @@ export default function CrawlingModal({
     }
 
     async function handleGenerate() {
+        // Check service health before proceeding
+        if (serviceHealth?.services) {
+            const activeServices = [
+                serviceHealth.services?.scrape_service?.status === "up",
+                serviceHealth.services?.reasoning_service?.status === "up",
+                serviceHealth.services?.obj_detection_service?.status === "up"
+            ].filter(Boolean).length
+
+            if (activeServices < 3) {
+                const inactiveServices = []
+                if (serviceHealth.services?.scrape_service?.status !== "up") inactiveServices.push('Scrape')
+                if (serviceHealth.services?.reasoning_service?.status !== "up") inactiveServices.push('Reasoning')
+                if (serviceHealth.services?.obj_detection_service?.status !== "up") inactiveServices.push('Detection')
+
+                const confirmMessage = `⚠️ Warning: ${inactiveServices.join(', ')} service(s) are currently inactive (${activeServices}/3 services active).\n\nProcessing may fail or produce incomplete results. Do you want to continue anyway?`
+
+                if (!confirm(confirmMessage)) {
+                    return
+                }
+            }
+        }
+
         try {
             setLogs([])
             setTimeElapsed(0)
@@ -827,13 +895,67 @@ export default function CrawlingModal({
                 {/* Actions Footer - Fixed at bottom */}
                 <div className="pt-4 mt-4">
                     {activeTab === "detail" && (
-                        <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={handleClose}>
-                                Cancel
-                            </Button>
-                            <Button onClick={handleGenerate}>
-                                {inputMode === 'search' ? 'Generate' : 'Process Domains'}
-                            </Button>
+                        <div className="flex justify-between items-center gap-2">
+                            {/* Service Status */}
+                            <div className="flex items-center gap-2">
+                                {loadingHealth ? (
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Checking services...</span>
+                                    </div>
+                                ) : serviceHealth ? (
+                                    <div className="flex items-center gap-2">
+                                        <div className={`text-xs font-medium ${[
+                                            serviceHealth.services?.scrape_service?.status === "up",
+                                            serviceHealth.services?.reasoning_service?.status === "up",
+                                            serviceHealth.services?.obj_detection_service?.status === "up"
+                                        ].filter(Boolean).length === 3
+                                            ? 'text-green-600 dark:text-green-400'
+                                            : 'text-orange-600 dark:text-orange-400'
+                                            }`}>
+                                            {[
+                                                serviceHealth.services?.scrape_service?.status === "up",
+                                                serviceHealth.services?.reasoning_service?.status === "up",
+                                                serviceHealth.services?.obj_detection_service?.status === "up"
+                                            ].filter(Boolean).length}/3 Services
+                                        </div>
+                                        <div className="flex gap-1" title="Scrape | Reasoning | Detection">
+                                            <div className={`w-2 h-2 rounded-full ${serviceHealth.services?.scrape_service?.status === "up" ? 'bg-green-500' : 'bg-red-500'
+                                                }`} title="Scrape Service" />
+                                            <div className={`w-2 h-2 rounded-full ${serviceHealth.services?.reasoning_service?.status === "up" ? 'bg-green-500' : 'bg-red-500'
+                                                }`} title="Reasoning Service" />
+                                            <div className={`w-2 h-2 rounded-full ${serviceHealth.services?.obj_detection_service?.status === "up" ? 'bg-green-500' : 'bg-red-500'
+                                                }`} title="Detection Service" />
+                                        </div>
+                                        <button
+                                            onClick={fetchServiceHealth}
+                                            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                            title="Refresh service status"
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="text-xs text-red-600 dark:text-red-400">
+                                        Service status unavailable
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex gap-2">
+                                <Button variant="outline" onClick={handleClose}>
+                                    Cancel
+                                </Button>
+                                <Button onClick={handleGenerate}>
+                                    {inputMode === 'search' ? 'Generate' : 'Process Domains'}
+                                </Button>
+                            </div>
                         </div>
                     )}
 
