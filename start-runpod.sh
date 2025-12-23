@@ -131,7 +131,9 @@ echo ""
 # ==========================================
 # 3. Start Integrasi Service
 # ==========================================
-print_info "Step 3: Starting Integrasi Service (port 5000)..."
+# Get port from environment or use default
+INTEGRASI_PORT=${SERVICE_API_PORT:-5000}
+print_info "Step 3: Starting Integrasi Service (port $INTEGRASI_PORT)..."
 
 cd integrasi-service
 nohup python main_api.py > ../logs/integrasi-service.log 2>&1 &
@@ -150,10 +152,12 @@ echo ""
 # ==========================================
 # 4. Start Backend Service
 # ==========================================
-print_info "Step 4: Starting Backend Service (port 8000)..."
+# Get port from environment or use default
+BACKEND_PORT=${BACKEND_PORT:-8000}
+print_info "Step 4: Starting Backend Service (port $BACKEND_PORT)..."
 
 cd backend
-nohup python -m uvicorn main:app --host 0.0.0.0 --port 8000 > ../logs/backend.log 2>&1 &
+nohup python -m uvicorn main:app --host 0.0.0.0 --port $BACKEND_PORT > ../logs/backend.log 2>&1 &
 BACKEND_PID=$!
 cd ..
 
@@ -169,10 +173,12 @@ echo ""
 # ==========================================
 # 5. Start Frontend
 # ==========================================
-print_info "Step 5: Starting Frontend (port 3000)..."
+# Get port from environment or use default
+FRONTEND_PORT=${FRONTEND_PORT:-3000}
+print_info "Step 5: Starting Frontend (port $FRONTEND_PORT)..."
 
 cd frontend
-PORT=3000 nohup npm run dev -- -H 0.0.0.0 > ../logs/frontend.log 2>&1 &
+PORT=$FRONTEND_PORT nohup npm run dev -- -H 0.0.0.0 > ../logs/frontend.log 2>&1 &
 FRONTEND_PID=$!
 cd ..
 
@@ -211,20 +217,20 @@ echo ""
 
 # Determine Public URL
 if [ -n "$RUNPOD_POD_ID" ]; then
-    PUBLIC_URL="https://${RUNPOD_POD_ID}-3000.proxy.runpod.net"
+    PUBLIC_URL="https://${RUNPOD_POD_ID}-${FRONTEND_PORT}.proxy.runpod.net"
 else
-    PUBLIC_URL="http://localhost:3000"
+    PUBLIC_URL="http://localhost:${FRONTEND_PORT}"
 fi
 
 echo "Services:"
-echo "  • PostgreSQL:         localhost:5432"
-echo "  • Integrasi Service:  http://localhost:5000 (PID: $INTEGRASI_PID)"
-echo "  • Backend API:        http://0.0.0.0:8000 (PID: $BACKEND_PID)"
-echo "  • Frontend:           http://0.0.0.0:3000 (PID: $FRONTEND_PID)"
+echo "  • PostgreSQL:         localhost:${DB_PORT:-5432}"
+echo "  • Integrasi Service:  http://localhost:${INTEGRASI_PORT} (PID: $INTEGRASI_PID)"
+echo "  • Backend API:        http://0.0.0.0:${BACKEND_PORT} (PID: $BACKEND_PID)"
+echo "  • Frontend:           http://0.0.0.0:${FRONTEND_PORT} (PID: $FRONTEND_PID)"
 echo ""
 echo "Access the application:"
 echo -e "  Dashboard:  ${GREEN}$PUBLIC_URL${NC}"
-echo "  API Docs:   http://localhost:8000/docs"
+echo "  API Docs:   http://localhost:${BACKEND_PORT}/docs"
 echo ""
 echo "View logs:"
 echo "  tail -f logs/integrasi-service.log"
