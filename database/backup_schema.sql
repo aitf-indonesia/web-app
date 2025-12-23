@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 293PrtOuEwVXY3TsJz9p58Tun7M0a6bFzpalx9RVgT7JxhWLTTroEGm5oenWXeG
+\restrict mL799CU0PVxL8c2DWTtencAGU6zyGUPdzB4IDDceHT4IaG5IS4PZzt85BSaeDLd
 
 -- Dumped from database version 16.11 (Ubuntu 16.11-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.11 (Ubuntu 16.11-0ubuntu0.24.04.1)
@@ -17,13 +17,6 @@ SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
-
---
--- Name: public; Type: SCHEMA; Schema: -; Owner: -
---
-
--- *not* creating schema, since initdb creates it
-
 
 --
 -- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: -
@@ -536,5 +529,5 @@ ALTER TABLE ONLY public.generator_settings
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 293PrtOuEwVXY3TsJz9p58Tun7M0a6bFzpalx9RVgT7JxhWLTTroEGm5oenWXeG
+\unrestrict mL799CU0PVxL8c2DWTtencAGU6zyGUPdzB4IDDceHT4IaG5IS4PZzt85BSaeDLd
 

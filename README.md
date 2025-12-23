@@ -52,38 +52,72 @@ Pengawasan Ruang Digital (PRD) Analyst is a comprehensive monitoring and analysi
 ## Project Structure
 
 ```
-prototype-dashboard-chatbot/
-├── frontend/              # Next.js application
+web-app/
+├── frontend/                      # Next.js application (Port 3001)
 │   ├── src/
-│   │   ├── app/          # App router pages
-│   │   ├── components/   # React components
-│   │   └── lib/          # Utilities and helpers
-│   ├── public/           # Static assets
+│   │   ├── app/                  # App router pages
+│   │   │   ├── dashboard/        # Main dashboard page
+│   │   │   ├── admin/            # Admin panel
+│   │   │   └── login/            # Authentication
+│   │   ├── components/           # React components
+│   │   │   ├── ui/               # Reusable UI components
+│   │   │   ├── dashboard/        # Dashboard-specific components
+│   │   │   └── admin/            # Admin panel components
+│   │   └── lib/                  # Utilities and helpers
+│   ├── public/                   # Static assets
+│   ├── .env.local                # Frontend environment config
 │   └── package.json
 │
-├── backend/               # FastAPI application
-│   ├── routes/           # API route handlers
-│   ├── models/           # Database models
-│   ├── utils/            # Helper functions
-│   ├── main.py           # Application entry point
+├── backend/                       # FastAPI application (Port 8000)
+│   ├── routes/                   # API route handlers
+│   │   ├── announcements.py      # Announcement endpoints
+│   │   ├── auth.py               # Authentication endpoints
+│   │   ├── chat.py               # Chat history endpoints
+│   │   ├── domains.py            # Domain management endpoints
+│   │   ├── generator_settings.py # Generator configuration
+│   │   └── health.py             # Health check endpoints
+│   ├── stores/                   # Data access layer
+│   ├── utils/                    # Helper functions
+│   ├── db.py                     # Database connection
+│   ├── main.py                   # Application entry point
 │   └── requirements.txt
 │
-├── database/              # Database initialization
-│   ├── init.sql          # Schema and seed data
-│   └── backups/          # Database backups (gitignored)
+├── integrasi-service/             # Integration service (Port 5000)
+│   ├── domain-generator/         # Domain discovery module
+│   │   ├── crawler.py            # Web crawler with screenshot capture
+│   │   ├── keyword_generator.py  # Keyword generation logic
+│   │   └── db_handler.py         # Database operations
+│   ├── docs/                     # Service documentation
+│   ├── test/                     # Test files and examples
+│   └── main_api.py               # FastAPI service entry point
 │
-├── docs/                  # Documentation files
-│   ├── DOCKER.md
-│   └── DOCKER-QUICKSTART.md
+├── database/                      # Database files
+│   ├── init-schema.sql           # Database schema definition
+│   ├── init-data.sql             # Initial seed data
+│   ├── backup_schema.sql         # Auto-generated schema backup
+│   └── backup_data.sql           # Auto-generated data backup (every 5 min)
 │
-├── archives/              # Legacy files and guides
-│   └── vps-deployment/
+├── logs/                          # Application logs
+│   ├── frontend.log              # Frontend service logs
+│   ├── backend.log               # Backend API logs
+│   └── integrasi.log             # Integration service logs
 │
-├── docker-compose.yml     # Docker orchestration
-├── nginx.docker.conf      # Nginx configuration
-├── docker-dev.sh          # Docker helper script
-├── .env.docker            # Docker environment config
-└── README.md              # This file
+├── docs/                          # Documentation files
+│   ├── PANDUAN_SISTEM.md         # Complete system guide (Indonesian)
+│   └── QUICK-START.md            # Quick start guide (English)
+│
+├── archives/                      # Legacy files and archived code
+│   └── vps-deployment/           # Old deployment scripts
+│
+├── .env                           # Root environment configuration
+├── .env.example                   # Environment template
+├── setup-runpod.sh                # Initial setup script for RunPod
+├── start-runpod.sh                # Start all services
+├── stop-all.sh                    # Stop all running services
+├── backup_db.sh                   # Database backup automation
+├── change_admin_password.py       # Admin password management
+├── requirements.txt               # Root Python dependencies
+└── README.md                      # This file
 ```
 
 ## Tech Stack
