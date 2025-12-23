@@ -112,29 +112,70 @@ web-app/
 ## Tech Stack
 
 ### Frontend
-- **Next.js** 16.0.0 - React framework with App Router
-- **React** 19.2.0 - UI library
-- **TailwindCSS** 4 - Utility-first CSS framework
-- **TypeScript** - Type-safe JavaScript
-- **Radix UI** - Accessible component primitives
-- **Recharts** - Data visualization library
-- **React Markdown** - Markdown rendering for chatbot
-- **Lucide React** - Icon library
-- **pnpm** - Fast, disk space efficient package manager
 
-### Backend
-- **FastAPI** - Modern Python web framework
-- **Python** 3.11+ - Programming language
-- **Uvicorn** - ASGI server
-- **PostgreSQL** 14 - Relational database
-- **psycopg2** - PostgreSQL adapter
-- **Pydantic** - Data validation
+| Tech Stack | Version | Note |
+|------------|---------|------|
+| Next.js | 16.0.0 | React framework with App Router |
+| React | 19.2.0 | UI library |
+| TypeScript | 5 | Type-safe JavaScript |
+| TailwindCSS | 4 | Utility-first CSS framework with PostCSS |
+| Radix UI | | Accessible component primitives (Dialog, Tooltip, Slot) |
+| Recharts | 3.3.0 | Data visualization library |
+| Chart.js | 4.5.1 | Additional charting library |
+| React Markdown | 10.1.0 | Markdown rendering for chatbot |
+| Lucide React | | Modern icon library |
+| SWR | 2.3.6 | React Hooks for data fetching |
+| Geist | | Vercel's font system |
+| pnpm | | Fast, disk space efficient package manager |
+
+### Backend API
+
+| Tech Stack | Version | Note |
+|------------|---------|------|
+| FastAPI | 0.124.4 | Modern Python web framework |
+| Python | 3.11+ | Programming language |
+| Uvicorn | 0.38.0 | Lightning-fast ASGI server |
+| SQLAlchemy | 2.0.36 | SQL toolkit and ORM |
+| Pydantic | 2.12.3 | Data validation and settings management |
+| PostgreSQL | 14+ | Relational database |
+| psycopg2-binary | 2.9.11 | PostgreSQL adapter |
+
+### Integration Service
+
+| Tech Stack | Version | Note |
+|------------|---------|------|
+| FastAPI | | Service orchestration framework |
+| DuckDuckGo Search (ddgs) | 9.10.0 | Privacy-focused search engine API |
+| Playwright | 1.57.0 | Browser automation for screenshots |
+| BeautifulSoup4 | 4.14.3 | HTML/XML parsing |
+| httpx | 0.28.1 | Modern HTTP client with SSE support |
+| aiohttp | 3.9.1 | Async HTTP client/server |
+| Pillow | 10.1.0 | Image processing library |
+
+### Authentication & Security
+
+| Tech Stack | Version | Note |
+|------------|---------|------|
+| python-jose | 3.3.0 | JWT token handling |
+| passlib | 1.7.4 | Password hashing with bcrypt |
+| python-multipart | | File upload support |
 
 ### Infrastructure & DevOps
-- **Docker** - Containerization platform
-- **Nginx** - Reverse proxy and web server
-- **Git** - Version control
-- **Pod Container** - Containerization platform
+
+| Tech Stack | Version | Note |
+|------------|---------|------|
+| Nginx | | Reverse proxy and web server |
+| Git | | Version control |
+| Miniconda | | Python environment management |
+| Bash Scripts | | Automated setup and deployment |
+
+### Development Tools
+
+| Tech Stack | Version | Note |
+|------------|---------|------|
+| python-dotenv | 1.1.0 | Environment variable management |
+| ESLint | 9 | JavaScript/TypeScript linting |
+| Autoprefixer | | CSS vendor prefixing |
 
 ## Integrasi Service
 
