@@ -6,7 +6,11 @@ import os
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 DATABASE_URL = os.getenv("DB_URL", "postgresql://postgres:root@localhost:5432/prd")
-engine = create_engine(DATABASE_URL)
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"client_encoding": "utf8"},
+    pool_pre_ping=True
+)
 SessionLocal = sessionmaker(bind=engine)
 
 def get_db():

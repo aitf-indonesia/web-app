@@ -433,12 +433,13 @@ export default function CrawlingModal({
             const data = await res.json()
             setJobId(data.job_id)
 
-            // Start streaming logs using fetch + ReadableStream to avoid browser buffering
+            // Start streaming logs from file (bypasses subprocess buffering)
             const controller = new AbortController()
             abortControllerRef.current = controller
 
             try {
-                const response = await fetch(`${API_BASE}/api/crawler/logs/${data.job_id}`, {
+                // Use file-based log streaming for real-time updates
+                const response = await fetch(`${API_BASE}/api/crawler/logs/file`, {
                     signal: controller.signal
                 })
 
@@ -498,8 +499,10 @@ export default function CrawlingModal({
                                     }
                                 }
 
-                                // Add log line
-                                setLogs((prev: string[]) => [...prev, message])
+                                // Add log line (skip keepalive comments)
+                                if (!message.startsWith(":")) {
+                                    setLogs((prev: string[]) => [...prev, message])
+                                }
                             }
                         }
                     }

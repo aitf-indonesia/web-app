@@ -172,6 +172,8 @@ print_info "Step 6: Setting up PostgreSQL database..."
 # Create PostgreSQL data directory if not exists
 PG_DATA_DIR="/workspace/postgresql/data"
 sudo mkdir -p "$PG_DATA_DIR"
+sudo mkdir -p /workspace/postgresql
+sudo chown -R postgres:postgres /workspace/postgresql
 
     # Initialize PostgreSQL database
     # Check if a valid database exists (PG_VERSION file)
@@ -351,6 +353,7 @@ SCRAPE_SERVICE_PORT=7000
 REASONING_SERVICE_HOST=localhost
 REASONING_SERVICE_PORT=8001
 REASONING_SERVICE_URL=http://localhost:8001/v1
+REASONING_MAX_TOKENS=600
 
 CHAT_SERVICE_HOST=localhost
 CHAT_SERVICE_PORT=8002

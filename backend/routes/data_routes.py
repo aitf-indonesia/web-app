@@ -52,7 +52,7 @@ def get_all_data(
             jenis = keywords.split(",")[0].strip().title() if keywords else "Judi"
             
             # Confidence is already in percentage (0-100) in DB
-            confidence_val = float(row.get("final_confidence")) if row.get("final_confidence") else 90.0
+            confidence_val = float(row.get("final_confidence")) if row.get("final_confidence") else 0.0  # Default to 0 if no confidence data
             kepercayaan = round(confidence_val)
             
             formatted.append({
