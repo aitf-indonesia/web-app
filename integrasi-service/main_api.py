@@ -88,6 +88,96 @@ def check_services():
 
 import subprocess
 import os
+import aiofiles
+import aiofiles.os
+
+# Log file path (must match crawler.py)
+LOG_FILE_PATH = "/home/ubuntu/web-app/integrasi-service/domain-generator/output/crawler.log"
+
+@app.get("/process/logs")
+async def stream_logs():
+    """
+    Stream crawler log file in real-time.
+    Frontend should poll this endpoint or use EventSource.
+    Returns logs from file with ===END=== marker when complete.
+    """
+    async def log_generator():
+        last_position = 0
+        end_marker_found = False
+        max_wait_cycles = 7200  # 2 hours max (7200 * 1 second) for large batches
+        wait_cycles = 0
+        
+        while not end_marker_found and wait_cycles < max_wait_cycles:
+            try:
+                # Check if file exists
+                if not os.path.exists(LOG_FILE_PATH):
+                    await asyncio.sleep(0.5)
+                    wait_cycles += 1
+                    continue
+                
+                # Read new content from file
+                async with aiofiles.open(LOG_FILE_PATH, mode='r', encoding='utf-8') as f:
+                    await f.seek(last_position)
+                    content = await f.read()
+                    
+                    if content:
+                        # Update position
+                        last_position = await f.tell()
+                        
+                        # Check for end marker
+                        if "===END===" in content:
+                            end_marker_found = True
+                        
+                        # Yield content
+                        yield content
+                    else:
+                        # No new content, wait a bit
+                        await asyncio.sleep(0.3)
+                        wait_cycles += 1
+                        
+            except Exception as e:
+                yield f"\n[ERROR] Failed to read log file: {str(e)}\n"
+                break
+        
+        if not end_marker_found:
+            yield "\n[TIMEOUT] Log streaming timed out\n"
+    
+    return StreamingResponse(
+        log_generator(),
+        media_type="text/plain",
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Connection": "keep-alive",
+            "Content-Type": "text/plain; charset=utf-8"
+        }
+    )
+
+@app.get("/process/logs/status")
+async def get_log_status():
+    """
+    Get current status of crawler log file.
+    Returns whether crawl is running, complete, or no log exists.
+    """
+    if not os.path.exists(LOG_FILE_PATH):
+        return {"status": "no_log", "message": "No crawler log file found"}
+    
+    try:
+        async with aiofiles.open(LOG_FILE_PATH, mode='r', encoding='utf-8') as f:
+            content = await f.read()
+            
+            if "===END===" in content:
+                # Check for success/failure
+                if "SUCCESS" in content:
+                    return {"status": "complete", "success": True, "message": "Crawler finished successfully"}
+                elif "FAILED" in content:
+                    return {"status": "complete", "success": False, "message": "Crawler finished with errors"}
+                else:
+                    return {"status": "complete", "success": None, "message": "Crawler finished (unknown status)"}
+            else:
+                return {"status": "running", "message": "Crawler is still running"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @app.post("/process")
 async def process_string(input_data: StringInput):

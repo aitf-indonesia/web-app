@@ -12,13 +12,6 @@ if sys.stdout is not None:
 if sys.stderr is not None:
     sys.stderr.reconfigure(line_buffering=False, write_through=True)
 
-# Monkey patch print to force flush (redundant but safe)
-import builtins
-_original_print = builtins.print
-def print(*args, **kwargs):
-    kwargs['flush'] = True
-    _original_print(*args, **kwargs)
-
 # Set environment variable for unbuffered output (backup)
 os.environ['PYTHONUNBUFFERED'] = '1'
 
@@ -37,7 +30,7 @@ from dotenv import load_dotenv
 import requests
 from playwright.sync_api import sync_playwright
 import base64
-
+import threading
 
 
 # Load environment variables
@@ -52,7 +45,11 @@ LAST_KEYWORDS_FILE = os.path.join(OUTPUT_DIR, "last_keywords.txt")
 
 # Database configuration
 DATABASE_URL = os.getenv("DB_URL", "postgresql://postgres:postgres@localhost:5432/prd")
-engine = create_engine(DATABASE_URL)
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"client_encoding": "utf8"},
+    pool_pre_ping=True
+)
 
 
 # Timeout configuration (in seconds)
@@ -77,27 +74,19 @@ VERSION = "1.4"
 # VLLM_BASE_URL = "http://202.79.101.81:52988/v1"
 VLLM_BASE_URL = os.getenv("REASONING_SERVICE_URL", "http://localhost:8001/v1")
 VLLM_MODEL_NAME = os.getenv("VLLM_MODEL_NAME", "aitfindonesia/KomdigiUB-8B-Instruct-PRD3")
+REASONING_MAX_TOKENS = int(os.getenv("REASONING_MAX_TOKENS", "600"))
 
+# Simplified system prompt (matching working test_tim3.py)
 REASONING_SYSTEM_PROMPT = """Tugas: Klasifikasikan apakah konten ini adalah SITUS JUDI atau BUKAN SITUS JUDI.
 
 DEFINISI:
-1. "judi" = SITUS JUDI: Konten yang mempromosikan/menyediakan/mengajak bermain judi online/offline
-   - Contoh: "Main slot bonus 100%", "Daftar di casino online", "Deposit sekarang main poker"
-   - Ciri: ada ajakan bermain, bonus, link daftar, cara deposit, promosi judi
+1. "judi" = SITUS JUDI: Konten yang mempromosikan / menyediakan / mengajak bermain judi
+2. "non_judi" = Semua konten lain (berita, edukasi, resep, dll)
 
-2. "non_judi" = BUKAN SITUS JUDI: Semua konten lain termasuk:
-   - Berita tentang penangkapan/pemberantasan judi
-   - Artikel edukasi bahaya judi
-   - Laporan investigasi tentang judi
-   - Konten umum: berita, resep, edukasi, bisnis, dll
-   - Contoh: "Polisi tangkap bandar judi", "Judi merusak keluarga", "Resep masakan"
-
-ANALISIS KONTEN PADA URL yang diinputkan
-
-JAWAB DALAM FORMAT JSON INI:
+JAWAB DALAM FORMAT JSON:
 {
   "label": "judi" atau "non_judi",
-  "reasoning": "Penjelasan singkat",
+  "reasoning": "Alasan singkat",
   "confidence": 0.95
 }
 """
@@ -109,6 +98,53 @@ BLOCKED_DOMAINS = set()
 # Ensure output directories exist
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(OUTPUT_IMG_DIR, exist_ok=True)
+
+# Log file for real-time streaming
+LOG_FILE = os.path.join(OUTPUT_DIR, "crawler.log")
+LOG_LOCK = threading.Lock()
+
+def log_print(*args, **kwargs):
+    """Print to both stdout and log file for real-time streaming."""
+    message = " ".join(str(arg) for arg in args)
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    log_line = f"[{timestamp}] {message}"
+    
+    # Print to stdout
+    print(log_line, flush=True)
+    
+    # Write to log file with lock for thread safety
+    with LOG_LOCK:
+        try:
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(log_line + "\n")
+                f.flush()
+                os.fsync(f.fileno())  # Force write to disk
+        except Exception as e:
+            print(f"[LOG ERROR] Failed to write to log file: {e}", flush=True)
+
+def init_log_file():
+    """Initialize/clear log file at start of crawl."""
+    try:
+        with open(LOG_FILE, "w", encoding="utf-8") as f:
+            f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Crawler started\n")
+            f.flush()
+        return True
+    except Exception as e:
+        print(f"[LOG ERROR] Failed to initialize log file: {e}", flush=True)
+        return False
+
+def finish_log_file(success=True):
+    """Mark log file as complete."""
+    status = "SUCCESS" if success else "FAILED"
+    with LOG_LOCK:
+        try:
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Crawler finished: {status}\n")
+                f.write("===END===\n")  # Marker for frontend to detect completion
+                f.flush()
+                os.fsync(f.fileno())
+        except Exception as e:
+            log_print(f"[LOG ERROR] Failed to finish log file: {e}")
 
 
 def get_last_id():
@@ -538,7 +574,7 @@ def call_reasoning_llm(scraped_data, item_id):
                 {"role": "user", "content": combined_content}
             ],
             "temperature": 0.2,
-            "max_tokens": 600
+            "max_tokens": REASONING_MAX_TOKENS
         }
         
         response = requests.post(url, json=payload, timeout=120)
@@ -709,12 +745,12 @@ def process_apis_parallel(all_results):
 
 def save_to_database(all_results, keyword, username='system'):
     """Save crawled results to database with user tracking."""
-    print("[DATABASE] Starting database save...", flush=True)
+    log_print("[DATABASE] Starting database save...")
     print(f"[DATABASE] Attempting to save {len(all_results)} records", flush=True)
-    print(f"[DATABASE] Username: {username}", flush=True)
+    log_print(f"[DATABASE] Username: {username}")
     
     if not all_results:
-        print("[DATABASE] WARNING: No results to save!", flush=True)
+        log_print("[DATABASE] WARNING: No results to save!")
         return False
     
     try:
@@ -738,13 +774,13 @@ def save_to_database(all_results, keyword, username='system'):
                     
                     if existing_id:
                         id_domain = existing_id[0]
-                        print(f"[DATABASE] Domain already exists with id_domain={id_domain}. Using existing ID.", flush=True)
+                        log_print(f"[DATABASE] Domain already exists with id_domain={id_domain}. Using existing ID.")
                         
                         # Update image_base64 if available
                         if result.get('image_base64'):
                              conn.execute(text("UPDATE generated_domains SET image_base64 = :image_base64 WHERE id_domain = :id_domain"), 
                                          {"image_base64": result.get('image_base64'), "id_domain": id_domain})
-                             print(f"[DATABASE] Updated image_base64 for id_domain={id_domain}", flush=True)
+                             log_print(f"[DATABASE] Updated image_base64 for id_domain={id_domain}")
                     else:
                         # Insert into generated_domains
                         insert_result = conn.execute(text("""
@@ -758,7 +794,7 @@ def save_to_database(all_results, keyword, username='system'):
                             "image_base64": result.get('image_base64')
                         })
                         id_domain = insert_result.fetchone()[0]
-                        print(f"[DATABASE] Inserted into generated_domains with id_domain={id_domain}", flush=True)
+                        log_print(f"[DATABASE] Inserted into generated_domains with id_domain={id_domain}")
                     
                     saved_count += 1
                     
@@ -843,7 +879,7 @@ def save_to_database(all_results, keyword, username='system'):
                                 )
                             """), detection_params)
                         detection_saved_count += 1
-                        print(f"[DATABASE] Inserted into object_detection", flush=True)
+                        log_print(f"[DATABASE] Inserted into object_detection")
                     
                     # Prepare reasoning data if available
                     id_reasoning = None
@@ -900,7 +936,7 @@ def save_to_database(all_results, keyword, username='system'):
                                     WHERE id_domain = :id_domain
                                 """), reasoning_params)
                                 id_reasoning = existing_reasoning[0]
-                                print(f"[DATABASE] Updated reasoning with id_reasoning={id_reasoning}", flush=True)
+                                log_print(f"[DATABASE] Updated reasoning with id_reasoning={id_reasoning}")
                             else:
                                 # INSERT new reasoning
                                 insert_result = conn.execute(text("""
@@ -920,7 +956,7 @@ def save_to_database(all_results, keyword, username='system'):
                                     RETURNING id_reasoning
                                 """), reasoning_params)
                                 id_reasoning = insert_result.fetchone()[0]
-                                print(f"[DATABASE] Inserted into reasoning with id_reasoning={id_reasoning}", flush=True)
+                                log_print(f"[DATABASE] Inserted into reasoning with id_reasoning={id_reasoning}")
                         except Exception as reasoning_error:
                             print(f"[DATABASE] Failed to insert/update reasoning: {str(reasoning_error)}", flush=True)
                     
@@ -929,19 +965,19 @@ def save_to_database(all_results, keyword, username='system'):
                     if detection_confidence_score is not None and reasoning_confidence_score is not None:
                         # Both available: 50-50 fusion
                         final_confidence = round((detection_confidence_score * 0.5) + (reasoning_confidence_score * 0.5), 1)
-                        print(f"[FUSION] Detection: {detection_confidence_score}%, Reasoning: {reasoning_confidence_score}% → Final: {final_confidence}%", flush=True)
+                        log_print(f"[FUSION] Detection: {detection_confidence_score}%, Reasoning: {reasoning_confidence_score}% → Final: {final_confidence}%")
                     elif detection_confidence_score is not None:
-                        # Only detection available
-                        final_confidence = detection_confidence_score
-                        print(f"[FUSION] Only detection available: {final_confidence}%", flush=True)
+                        # Only detection available: max 50% contribution
+                        final_confidence = round(detection_confidence_score * 0.5, 1)
+                        log_print(f"[FUSION] Only detection available: {detection_confidence_score}% × 0.5 = {final_confidence}%")
                     elif reasoning_confidence_score is not None:
-                        # Only reasoning available
-                        final_confidence = reasoning_confidence_score
-                        print(f"[FUSION] Only reasoning available: {final_confidence}%", flush=True)
+                        # Only reasoning available: max 50% contribution
+                        final_confidence = round(reasoning_confidence_score * 0.5, 1)
+                        log_print(f"[FUSION] Only reasoning available: {reasoning_confidence_score}% × 0.5 = {final_confidence}%")
                     else:
                         # Neither available
                         final_confidence = None
-                        print(f"[FUSION] No confidence data available", flush=True)
+                        log_print(f"[FUSION] No confidence data available")
                     
                     # Insert or update results table with created_by tracking
                     # properties for results
@@ -965,7 +1001,7 @@ def save_to_database(all_results, keyword, username='system'):
                     try:
                         if existing_result:
                             # UPDATE
-                            print(f"[DATABASE] Updating existing result for id_domain={id_domain}", flush=True)
+                            log_print(f"[DATABASE] Updating existing result for id_domain={id_domain}")
                             conn.execute(text("""
                                 UPDATE results SET
                                     id_reasoning = :id_reasoning,
@@ -980,10 +1016,10 @@ def save_to_database(all_results, keyword, username='system'):
                                     modified_at = now()
                                 WHERE id_domain = :id_domain
                             """), results_params)
-                            print(f"[DATABASE] Updated existing result for id_domain={id_domain}", flush=True)
+                            log_print(f"[DATABASE] Updated existing result for id_domain={id_domain}")
                         else:
                             # INSERT
-                            print(f"[DATABASE] Inserting new result for id_domain={id_domain}", flush=True)
+                            log_print(f"[DATABASE] Inserting new result for id_domain={id_domain}")
                             print(f"[DATABASE] Params: label_final={results_params.get('label_final')}, confidence={results_params.get('final_confidence')}", flush=True)
                             conn.execute(text("""
                                 INSERT INTO results (
@@ -1018,7 +1054,7 @@ def save_to_database(all_results, keyword, username='system'):
                                     now()
                                 )
                             """), results_params)
-                            print(f"[DATABASE] Inserted into results", flush=True)
+                            log_print(f"[DATABASE] Inserted into results")
                         
                         results_saved_count += 1
                     except Exception as e:
@@ -1039,7 +1075,7 @@ def save_to_database(all_results, keyword, username='system'):
                             "username": username,
                             "id_domain": id_domain
                         })
-                        print(f"[DATABASE] Audit log created for id_domain={id_domain}", flush=True)
+                        log_print(f"[DATABASE] Audit log created for id_domain={id_domain}")
                     except Exception as audit_error:
                         print(f"[WARN] Failed to create audit log (non-critical): {str(audit_error)[:100]}", flush=True)
                     
@@ -1052,12 +1088,12 @@ def save_to_database(all_results, keyword, username='system'):
                     print(f"[DATABASE] Record error traceback: {traceback.format_exc()}", flush=True)
                     # Continue with next record instead of failing completely
             
-            print(f"[DATABASE] ===== SAVE SUMMARY =====", flush=True)
-            print(f"[DATABASE] Successfully saved {saved_count} domains to generated_domains", flush=True)
-            print(f"[DATABASE] Successfully saved {detection_saved_count} detection results to object_detection", flush=True)
-            print(f"[DATABASE] Successfully saved {results_saved_count} results with created_by={username}", flush=True)
-            print(f"[DATABASE] Failed records: {failed_count}", flush=True)
-            print(f"[DATABASE] ===========================", flush=True)
+            log_print(f"[DATABASE] ===== SAVE SUMMARY =====")
+            log_print(f"[DATABASE] Successfully saved {saved_count} domains to generated_domains")
+            log_print(f"[DATABASE] Successfully saved {detection_saved_count} detection results to object_detection")
+            log_print(f"[DATABASE] Successfully saved {results_saved_count} results with created_by={username}")
+            log_print(f"[DATABASE] Failed records: {failed_count}")
+            log_print(f"[DATABASE] ===========================")
             return saved_count > 0  # Return True if at least one record was saved
             
     except Exception as e:
@@ -1071,6 +1107,9 @@ def save_to_database(all_results, keyword, username='system'):
 
 
 def main():
+    # Initialize log file for real-time streaming
+    init_log_file()
+    
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description='Domain Generator')
     parser.add_argument('-n', '--domain-count', type=int, default=10, help='Number of domains to generate')
@@ -1083,12 +1122,12 @@ def main():
     start_time = time.time()
     
     # Load existing domains, blocked domains, and blocked keywords first
-    print("[INIT] Loading existing domains, blocked domains, and blocked keywords...", flush=True)
+    log_print("[INIT] Loading existing domains, blocked domains, and blocked keywords...")
     load_seen_domains()
     load_blocked_domains()
     blocked_keywords = load_blocked_keywords()
-    print(f"[INIT] Loaded {len(SEEN_DOMAINS)} existing domains, {len(BLOCKED_DOMAINS)} blocked domains, {len(blocked_keywords)} blocked keywords", flush=True)
-    
+    log_print(f"[INIT] Loaded {len(SEEN_DOMAINS)} existing domains, {len(BLOCKED_DOMAINS)} blocked domains, {len(blocked_keywords)} blocked keywords")
+
     # Get keywords - either from args, last keywords, or stdin
     # If manual domains are provided, we don't need keywords for search, but we need a value for the variable
     if args.domains:
@@ -1101,9 +1140,6 @@ def main():
         if last_keywords:
             print(f"[INIT] Last used keywords: {', '.join(last_keywords)}", flush=True)
             try:
-                # Use a timeout or non-blocking method if possible, or just default to input
-                # In automated environment, this might block, so we should be careful.
-                # If we are in a non-interactive shell (pipe), input() raises EOFError.
                 if sys.stdin.isatty():
                     use_last = input("Use these keywords? (y/n): ").lower().strip()
                     if use_last == 'y':
@@ -1112,21 +1148,22 @@ def main():
                         keyword_input = input("Masukkan keyword (pisahkan dengan koma): ")
                         keywords = [k.strip() for k in keyword_input.split(',') if k.strip()]
                 else:
-                    # Non-interactive, default to using last keywords or failing
-                    print("[INFO] Non-interactive mode detected. Using last keywords.", flush=True)
+                    log_print("[INFO] Non-interactive mode detected. Using last keywords.")
                     keywords = last_keywords
             except EOFError:
-                 keywords = last_keywords
+                keywords = last_keywords
         else:
             if sys.stdin.isatty():
                 keyword_input = input("Masukkan keyword (pisahkan dengan koma): ")
                 keywords = [k.strip() for k in keyword_input.split(',') if k.strip()]
             else:
-                 print("[ERROR] No keywords provided and non-interactive mode", flush=True)
-                 return
+                log_print("[ERROR] No keywords provided and non-interactive mode")
+                finish_log_file(success=False)
+                return
 
     if not keywords:
-        print("[ERROR] No keywords provided", flush=True)
+        log_print("[ERROR] No keywords provided")
+        finish_log_file(success=False)
         return
     
     # Use domain count from args
@@ -1138,7 +1175,7 @@ def main():
     results = []
     
     if args.domains:
-        print("[MODE] Manual domain entry mode", flush=True)
+        log_print("[MODE] Manual domain entry mode")
         # Process manual domains
         manual_domains = [d.strip() for d in args.domains.split(',') if d.strip()]
         for domain in manual_domains:
@@ -1167,20 +1204,20 @@ def main():
     else:
         # SEARCH MODE
         print(f"[CONFIG] Keywords: {', '.join(keywords)}", flush=True)
-        print(f"[CONFIG] Target domains: {target_domains}", flush=True)
+        log_print(f"[CONFIG] Target domains: {target_domains}")
         
         # Combine all keywords for search and add blocked keywords with minus operator
         query = ' OR '.join(keywords)
         if blocked_keywords:
             query += ' ' + ' '.join(f'-{kw}' for kw in blocked_keywords)
-        print(f"[SEARCH] Starting search with query: {keywords} + blocked domains", flush=True)
+        log_print(f"[SEARCH] Starting search with query: {keywords} + blocked domains")
         
         # Get search results
-        print("[SEARCH] Fetching search results from DuckDuckGo...", flush=True)
+        log_print("[SEARCH] Fetching search results from DuckDuckGo...")
         results = DDGS().text(query, max_results=target_domains * 5)  # Get more results to handle filtering
         
         if not results:
-            print("[ERROR] No search results found", flush=True)
+            log_print("[ERROR] No search results found")
             return
         
         print(f"[SEARCH] Found {len(results)} search results", flush=True)
@@ -1189,7 +1226,7 @@ def main():
     last_id = get_last_id()
     current_id = last_id + 1
     
-    print(f"[INIT] Starting ID: {current_id:08d}", flush=True)
+    log_print(f"[INIT] Starting ID: {current_id:08d}")
     print(f"[FILTER] Filtering domains (target: {target_domains})...", flush=True)
     
     # Process results until we have target_domains valid domains
@@ -1208,14 +1245,14 @@ def main():
             continue
         
         if is_domain_blocked(domain):
-            print(f"[FILTER] Skipped blocked domain: {domain}", flush=True)
+            log_print(f"[FILTER] Skipped blocked domain: {domain}")
             continue
         
         if is_domain_duplicate(domain):
             if args.domains:
-                print(f"[FILTER] Domain {domain} is duplicate but allowing in MANUAL mode", flush=True)
+                log_print(f"[FILTER] Domain {domain} is duplicate but allowing in MANUAL mode")
             else:
-                print(f"[FILTER] Skipped duplicate domain: {domain}", flush=True)
+                log_print(f"[FILTER] Skipped duplicate domain: {domain}")
                 continue
         
         # All checks passed - this is a valid domain
@@ -1225,7 +1262,7 @@ def main():
         print(f"[FILTER] Added domain ({len(filtered_no_duplicates)}/{target_domains}): {domain}", flush=True)
     
     if not filtered_no_duplicates:
-        print("[ERROR] No valid domains found after filtering", flush=True)
+        log_print("[ERROR] No valid domains found after filtering")
         return
     
     print(f"[FILTER] Filtering complete. Total valid domains: {len(filtered_no_duplicates)}", flush=True)
@@ -1280,12 +1317,12 @@ def main():
     with open(json_filepath, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2, ensure_ascii=False)
     
-    print(f"[SAVE] JSON saved", flush=True)
+    log_print(f"[SAVE] JSON saved")
     
     # Update last ID
     final_id = current_id + len(all_results) - 1
     save_last_id(final_id)
-    print(f"[SAVE] Last ID updated: {final_id:08d}", flush=True)
+    log_print(f"[SAVE] Last ID updated: {final_id:08d}")
     
     # Save new domains to file
     save_new_domains(new_domains_list)
@@ -1355,14 +1392,17 @@ def main():
         "keywords": keywords
     }
     
-    # ✅ TAMBAHIN INI
+    # Save summary to JSON file
     summary_path = os.path.join(OUTPUT_DIR, "summary.json")
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(summary, f, ensure_ascii=False, indent=2)
-    print(f"[SAVE] Summary saved: {summary_path}", flush=True)
+    log_print(f"[SAVE] Summary saved: {summary_path}")
 
-    # (Opsional tapi recommended) output JSON murni biar gampang diparse
-    print(json.dumps(summary), flush=True)
+    # Output JSON summary for parsing
+    log_print(json.dumps(summary))
+    
+    # Mark log file as complete
+    finish_log_file(success=True)
 
 
 if __name__ == "__main__":

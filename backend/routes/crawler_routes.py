@@ -11,8 +11,12 @@ from datetime import datetime
 from utils.auth_middleware import get_current_user
 from sqlalchemy import text
 from db import engine 
+import aiofiles
 
 router = APIRouter()
+
+# Log file path (must match crawler.py in integrasi-service)
+LOG_FILE_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "integrasi-service", "domain-generator", "output", "crawler.log")
 
 # =========================
 # JOB MANAGEMENT
@@ -93,7 +97,7 @@ async def run_runpod_crawler(
         }
 
         # Stream response from RunPod API
-        async with httpx.AsyncClient(timeout=600.0) as client:
+        async with httpx.AsyncClient(timeout=3600.0) as client:  # 1 hour timeout for large batches
             async with client.stream("POST", runpod_url, json=payload, headers=headers) as response:
                 if response.status_code != 200:
                     error_text = await response.aread()
@@ -185,7 +189,7 @@ async def run_runpod_manual_crawler(
         }
 
         # Stream response from RunPod API
-        async with httpx.AsyncClient(timeout=600.0) as client:
+        async with httpx.AsyncClient(timeout=3600.0) as client:  # 1 hour timeout for large batches
             async with client.stream("POST", runpod_url, json=payload, headers=headers) as response:
                 if response.status_code != 200:
                     error_text = await response.aread()
@@ -313,7 +317,96 @@ async def start_manual_crawler(
 
 
 # =========================
-# API: STREAM LOGS (SSE)
+# API: STREAM LOGS FROM FILE (Real-time)
+# NOTE: This MUST come before /logs/{job_id} to avoid route conflict
+# =========================
+@router.get("/logs/file")
+async def stream_logs_from_file():
+    """
+    Stream logs directly from the crawler log file.
+    This bypasses subprocess buffering and provides real-time logs.
+    """
+    async def file_log_generator():
+        last_position = 0
+        end_marker_found = False
+        max_wait_cycles = 14400  # 2 hours max (14400 * 0.5 seconds) for large batches
+        wait_cycles = 0
+        
+        # Send initial keepalive
+        yield ": keepalive\n\n"
+        
+        while not end_marker_found and wait_cycles < max_wait_cycles:
+            try:
+                # Check if file exists
+                if not os.path.exists(LOG_FILE_PATH):
+                    await asyncio.sleep(0.5)
+                    wait_cycles += 1
+                    continue
+                
+                # Read new content from file
+                async with aiofiles.open(LOG_FILE_PATH, mode='r', encoding='utf-8') as f:
+                    await f.seek(last_position)
+                    content = await f.read()
+                    
+                    if content:
+                        # Update position
+                        last_position = await f.tell()
+                        
+                        # Check for end marker
+                        if "===END===" in content:
+                            end_marker_found = True
+                        
+                        # Split content into lines and send as SSE events
+                        lines = content.strip().split('\n')
+                        for line in lines:
+                            if line.strip():
+                                # Check if this is a summary JSON line (may have timestamp prefix)
+                                # Pattern: either starts with { or has timestamp like [08:31:56] {
+                                stripped_line = line.strip()
+                                json_start = stripped_line.find('{')
+                                if json_start != -1 and '"status"' in stripped_line and '"domains_generated"' in stripped_line:
+                                    try:
+                                        json_part = stripped_line[json_start:]
+                                        summary = json.loads(json_part)
+                                        yield f"data: [SUMMARY] {json_part}\n\n"
+                                        continue
+                                    except:
+                                        pass
+                                
+                                yield f"data: {line}\n\n"
+                        
+                        # Reset wait cycles since we got content
+                        wait_cycles = 0
+                    else:
+                        # No new content, wait a bit and send keepalive
+                        await asyncio.sleep(0.5)
+                        wait_cycles += 1
+                        
+                        # Send keepalive every 10 cycles (5 seconds)
+                        if wait_cycles % 10 == 0:
+                            yield ": keepalive\n\n"
+                        
+            except Exception as e:
+                yield f"data: [ERROR] Failed to read log file: {str(e)}\n\n"
+                break
+        
+        # Send completion marker
+        yield "data: [DONE]\n\n"
+    
+    return StreamingResponse(
+        file_log_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "Content-Type": "text/event-stream; charset=utf-8"
+        }
+    )
+
+
+# =========================
+# API: STREAM LOGS (SSE) - Job-based
 # =========================
 @router.get("/logs/{job_id}")
 async def stream_logs(job_id: str):

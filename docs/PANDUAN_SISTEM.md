@@ -53,11 +53,12 @@ Perintah ini akan menjalankan:
 Jika terdapat masalah pada start PostgreSQL (/workspace/postgresql/data), lakukan langkah berikut:
 
 ```bash
-sudo rm -rf /workspace/postgresql/data
+sudo rm -rf /workspace/postgresql/data # menghaus data lama
 sudo mkdir -p /workspace/postgresql/data
 
 ./setup-runpod.sh # setup ulang
 ```
+*Ini akan menggantikan database yang sebelumnya sudah dibackup*
 
 ## 3. Menghentikan Sistem
 
@@ -141,7 +142,61 @@ ORDER BY id;
 - **Konfirmasi:** Mode interaktif meminta konfirmasi password untuk menghindari typo
 - **Password Masking:** Input password tidak terlihat di terminal (menggunakan getpass)
 
-## 6. Troubleshooting & Log
+## 6. Domain Generator / Crawler
+
+### Lokasi File Crawler
+
+Script utama crawler berada di:
+```
+integrasi-service/domain-generator/crawler.py
+```
+
+### Output Files
+
+Struktur output:
+| File/Folder | Deskripsi |
+|-------------|-----------|
+| `output/img/` | Screenshot domain (format PNG) |
+| `output/crawler.log` | Log real-time saat crawling berjalan |
+| `output/all_domains.txt` | Daftar semua domain yang sudah diproses |
+| `output/last_id.txt` | ID terakhir yang digunakan |
+| `output/last_keywords.txt` | Keywords terakhir yang digunakan |
+| `output/summary.json` | Ringkasan hasil crawl terakhir |
+| `output/*.json` | File JSON hasil crawl per-sesi |
+
+### Menjalankan Crawler Manual
+
+Jika ingin menjalankan crawler secara manual (bukan dari UI):
+
+```bash
+# Aktifkan environment
+conda activate prd6
+
+# Pindah ke direktori crawler
+cd integrasi-service/domain-generator
+
+# Jalankan dengan keyword
+python crawler.py -k "judi online, slot gacor" -n 10
+
+# Atau dengan domain manual
+python crawler.py -d "https://example.com,https://test.com"
+```
+
+**Opsi Command Line:**
+| Opsi | Deskripsi |
+|------|-----------|
+| `-k, --keywords` | Keyword untuk pencarian (pisahkan dengan koma) |
+| `-n, --domain-count` | Jumlah domain yang akan di-generate (default: 10) |
+| `-d, --domains` | Domain manual untuk diproses langsung |
+| `-u, --username` | Username untuk tracking (default: system) |
+
+### Melihat Log Crawler Real-time
+
+```bash
+tail -f integrasi-service/domain-generator/output/crawler.log
+```
+
+## 7. Troubleshooting & Log
 
 Jika terjadi masalah, Anda dapat memeriksa log yang tersimpan di folder `logs/`.
 
@@ -179,7 +234,7 @@ Gunakan perintah `tail` untuk memantau aktivitas:
     *   Pastikan folder `integrasi-service/domain-generator/output/img` ada dan memiliki izin tulis.
     *   Sistem sekarang menyimpan gambar sebagai **Base64** di database, bukan hanya file fisik.
 
-## 7. Pembaruan Dependensi
+## 8. Pembaruan Dependensi
 
 Jika ada perubahan pada `requirements.txt` atau `package.json`:
 
